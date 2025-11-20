@@ -82,6 +82,7 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
     const [loading, setLoading] = useState(false);
     const [viewError, setViewError] = useState<{ title: string, message: string, code?: string, docLink?: string, details?: string } | null>(null);
     const [editorPreviewHtml, setEditorPreviewHtml] = useState('');
+    const [isDraggingOver, setIsDraggingOver] = useState(false);
 
     const isMobile = useIsMobile();
 
@@ -1513,22 +1514,40 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
             {/* File Area */}
             <div
                 ref={listRef}
-                className="flex-1 overflow-y-auto bg-background overscroll-none pb-4 md:pb-20 relative z-10 transition-transform duration-200 ease-out"
+                className={`flex-1 overflow-y-auto bg-background overscroll-none pb-4 md:pb-20 relative z-10 transition-all duration-200 ease-out ${isDraggingOver ? 'bg-blue-500/5 ring-2 ring-blue-500 ring-inset' : ''}`}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onDragOver={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     e.dataTransfer.dropEffect = 'copy';
+                    setIsDraggingOver(true);
+                }}
+                onDragEnter={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingOver(true);
+                }}
+                onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // Only set false if leaving the main container, not entering a child
+                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                    setIsDraggingOver(false);
                 }}
                 onDrop={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingOver(false);
                     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
                         Array.from(e.dataTransfer.files).forEach(f => onUpload(f, currentPrefix, () => setRefreshTrigger(p => p + 1)));
                     }
                 }}
                 style={{ transform: isPulling ? `translateY(${pullDistance}px)` : 'none' }}
             >
+
+
                 {/* Permission Denied / Error View */}
                 {viewError ? (
                     <div className="flex flex-col items-center justify-center h-[60vh] p-8 text-center animate-in fade-in duration-500 select-text">
