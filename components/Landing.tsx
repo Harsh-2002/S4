@@ -2,7 +2,7 @@
 import React from 'react';
 import {
     ArrowRight, Globe, Zap, Github, UploadCloud, Eye,
-    Database, CloudLightning, Search, Cloud,
+    Database, CloudLightning, Search,
     Folder, Image as ImageIcon, FileCode, MoreHorizontal, ShieldCheck,
     Sparkles, LayoutGrid, ChevronRight, Command, User, Bell, Settings,
     Star, Clock, HardDrive, MoreVertical, List, Filter, Code2
@@ -370,147 +370,121 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                 </div>
 
                 {/* Security & Privacy Section */}
-                <div className="w-full max-w-4xl mx-auto mb-20 p-8 rounded-2xl border border-border bg-card/30 backdrop-blur-sm">
-                    <div className="flex items-center justify-center gap-3 mb-6">
-                        <ShieldCheck size={32} className="text-green-500" />
-                        <h2 className="text-2xl md:text-3xl font-bold">Security & Privacy</h2>
+                <div className="w-full max-w-6xl mx-auto mb-20">
+                    <div className="text-center mb-12">
+                        <h2 className="text-3xl md:text-4xl font-bold mb-4">Security & Privacy</h2>
+                        <p className="text-muted-foreground max-w-2xl mx-auto">Your data security is our top priority</p>
                     </div>
 
-                    <div className="space-y-4 text-muted-foreground">
-                        <p className="leading-relaxed">
-                            <strong className="text-foreground">100% Client-Side:</strong> S4 runs entirely in your browser. There is no backend server, no database, and no data collection. Your files and credentials never touch our servers because we don't have any.
-                        </p>
-                        <p className="leading-relaxed">
-                            <strong className="text-foreground">Local Encryption:</strong> Saved connection profiles are encrypted using AES-GCM 256-bit encryption via the Web Crypto API and stored in your browser's local storage.
-                        </p>
-                        <p className="leading-relaxed">
-                            <strong className="text-foreground">Direct Connection:</strong> All S3 operations connect directly from your browser to your storage provider. Your access keys are never transmitted to any third party.
-                        </p>
-                        <p className="leading-relaxed">
-                            <strong className="text-foreground">Open Source:</strong> The entire codebase is open source and available on GitHub for inspection, auditing, or self-hosting.
-                        </p>
-                    </div>
-                </div>
-
-                {/* Quick Start Section */}
-                <div className="w-full max-w-4xl mx-auto mb-20">
-                    <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">Quick Start Guide</h2>
-
-                    <div className="space-y-6">
-                        <div className="p-6 rounded-xl border border-border bg-card/30 backdrop-blur-sm">
-                            <div className="flex items-start gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                                    <Cloud size={20} className="text-blue-500" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold mb-2">AWS S3</h3>
-                                    <p className="text-sm text-muted-foreground mb-2">
-                                        Use endpoint <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">s3.amazonaws.com</code> or region-specific endpoints like <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">s3.us-east-1.amazonaws.com</code>
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        Required IAM permissions: <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">s3:ListBucket</code>, <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">s3:GetObject</code>, <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">s3:PutObject</code>
-                                    </p>
-                                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                        <div className="group p-6 rounded-2xl bg-card/50 border border-border hover:border-foreground/20 hover:bg-card transition-all duration-300 backdrop-blur-sm hover:-translate-y-1 cursor-default relative overflow-hidden shadow-sm">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-500/10 to-transparent rounded-bl-3xl -mr-4 -mt-4 transition-transform group-hover:scale-150 duration-700"></div>
+                            <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 border border-green-500/20 relative z-10">
+                                <Database size={24} className="text-green-500" />
                             </div>
+                            <h3 className="text-lg font-bold mb-2 text-foreground group-hover:text-primary transition-colors relative z-10">100% Client-Side</h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors relative z-10">
+                                S4 runs entirely in your browser. No backend servers, no databases, no data collection. Your files and credentials never touch our servers because we don't have any.
+                            </p>
                         </div>
 
-                        <div className="p-6 rounded-xl border border-border bg-card/30 backdrop-blur-sm">
-                            <div className="flex items-start gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
-                                    <CloudLightning size={20} className="text-orange-500" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold mb-2">Cloudflare R2</h3>
-                                    <p className="text-sm text-muted-foreground mb-2">
-                                        Endpoint format: <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">https://{'<account-id>'}.r2.cloudflarestorage.com</code>
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        Use R2 API tokens from your Cloudflare dashboard. Set region to <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">auto</code>
-                                    </p>
-                                </div>
+                        <div className="group p-6 rounded-2xl bg-card/50 border border-border hover:border-foreground/20 hover:bg-card transition-all duration-300 backdrop-blur-sm hover:-translate-y-1 cursor-default relative overflow-hidden shadow-sm">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-3xl -mr-4 -mt-4 transition-transform group-hover:scale-150 duration-700"></div>
+                            <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 border border-blue-500/20 relative z-10">
+                                <ShieldCheck size={24} className="text-blue-500" />
                             </div>
+                            <h3 className="text-lg font-bold mb-2 text-foreground group-hover:text-primary transition-colors relative z-10">Local Encryption</h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors relative z-10">
+                                Connection profiles are encrypted using AES-GCM 256-bit encryption via the Web Crypto API and stored in your browser's local storage.
+                            </p>
                         </div>
 
-                        <div className="p-6 rounded-xl border border-border bg-card/30 backdrop-blur-sm">
-                            <div className="flex items-start gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
-                                    <Database size={20} className="text-purple-500" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold mb-2">MinIO / Self-Hosted S3</h3>
-                                    <p className="text-sm text-muted-foreground mb-2">
-                                        Use your custom endpoint, e.g., <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">https://minio.example.com</code>
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        Ensure CORS is configured on your storage server to allow browser access.
-                                    </p>
-                                </div>
+                        <div className="group p-6 rounded-2xl bg-card/50 border border-border hover:border-foreground/20 hover:bg-card transition-all duration-300 backdrop-blur-sm hover:-translate-y-1 cursor-default relative overflow-hidden shadow-sm">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-500/10 to-transparent rounded-bl-3xl -mr-4 -mt-4 transition-transform group-hover:scale-150 duration-700"></div>
+                            <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 border border-purple-500/20 relative z-10">
+                                <Zap size={24} className="text-purple-500" />
                             </div>
+                            <h3 className="text-lg font-bold mb-2 text-foreground group-hover:text-primary transition-colors relative z-10">Direct Connection</h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors relative z-10">
+                                All S3 operations connect directly from your browser to your storage provider. Your access keys are never transmitted to any third party.
+                            </p>
+                        </div>
+
+                        <div className="group p-6 rounded-2xl bg-card/50 border border-border hover:border-foreground/20 hover:bg-card transition-all duration-300 backdrop-blur-sm hover:-translate-y-1 cursor-default relative overflow-hidden shadow-sm">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-yellow-500/10 to-transparent rounded-bl-3xl -mr-4 -mt-4 transition-transform group-hover:scale-150 duration-700"></div>
+                            <div className="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 border border-yellow-500/20 relative z-10">
+                                <Code2 size={24} className="text-yellow-500" />
+                            </div>
+                            <h3 className="text-lg font-bold mb-2 text-foreground group-hover:text-primary transition-colors relative z-10">Open Source</h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors relative z-10">
+                                The entire codebase is open source and available on GitHub for inspection, auditing, or self-hosting on your own infrastructure.
+                            </p>
                         </div>
                     </div>
                 </div>
 
                 {/* FAQ Section */}
-                <div className="w-full max-w-4xl mx-auto mb-20">
-                    <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">Frequently Asked Questions</h2>
+                <div className="w-full max-w-6xl mx-auto mb-20">
+                    <div className="text-center mb-12">
+                        <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
+                        <p className="text-muted-foreground max-w-2xl mx-auto">Everything you need to know about S4</p>
+                    </div>
 
-                    <div className="space-y-4">
-                        <details className="group p-6 rounded-xl border border-border bg-card/30 backdrop-blur-sm cursor-pointer">
-                            <summary className="font-semibold text-lg list-none flex items-center justify-between">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                        <div className="group p-6 rounded-2xl bg-card/50 border border-border hover:border-foreground/20 hover:bg-card transition-all duration-300 backdrop-blur-sm cursor-default relative overflow-hidden shadow-sm">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-500/10 to-transparent rounded-bl-3xl -mr-4 -mt-4 transition-transform group-hover:scale-150 duration-700"></div>
+                            <h3 className="text-lg font-bold mb-3 text-foreground relative z-10 flex items-start gap-2">
+                                <ShieldCheck size={20} className="text-green-500 shrink-0 mt-0.5" />
                                 Is my data secure?
-                                <ChevronRight size={20} className="transform group-open:rotate-90 transition-transform text-muted-foreground" />
-                            </summary>
-                            <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
-                                Yes. S4 is entirely client-side, meaning all operations happen in your browser. Your credentials are encrypted locally using AES-GCM and never leave your device. There is no backend server collecting or storing your data.
+                            </h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed relative z-10">
+                                Yes. S4 is entirely client-side. Your credentials are encrypted locally using AES-GCM and never leave your device. No backend server collects or stores your data.
                             </p>
-                        </details>
+                        </div>
 
-                        <details className="group p-6 rounded-xl border border-border bg-card/30 backdrop-blur-sm cursor-pointer">
-                            <summary className="font-semibold text-lg list-none flex items-center justify-between">
-                                What storage providers are supported?
-                                <ChevronRight size={20} className="transform group-open:rotate-90 transition-transform text-muted-foreground" />
-                            </summary>
-                            <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
-                                S4 supports AWS S3, Cloudflare R2, MinIO, and any S3-compatible storage provider. As long as your provider supports the S3 API, you can use S4 to manage it.
+                        <div className="group p-6 rounded-2xl bg-card/50 border border-border hover:border-foreground/20 hover:bg-card transition-all duration-300 backdrop-blur-sm cursor-default relative overflow-hidden shadow-sm">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-3xl -mr-4 -mt-4 transition-transform group-hover:scale-150 duration-700"></div>
+                            <h3 className="text-lg font-bold mb-3 text-foreground relative z-10 flex items-start gap-2">
+                                <Globe size={20} className="text-blue-500 shrink-0 mt-0.5" />
+                                What providers are supported?
+                            </h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed relative z-10">
+                                AWS S3, Cloudflare R2, MinIO, and any S3-compatible storage provider. If it supports the S3 API, you can use S4 to manage it.
                             </p>
-                        </details>
+                        </div>
 
-                        <details className="group p-6 rounded-xl border border-border bg-card/30 backdrop-blur-sm cursor-pointer">
-                            <summary className="font-semibold text-lg list-none flex items-center justify-between">
+                        <div className="group p-6 rounded-2xl bg-card/50 border border-border hover:border-foreground/20 hover:bg-card transition-all duration-300 backdrop-blur-sm cursor-default relative overflow-hidden shadow-sm">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-500/10 to-transparent rounded-bl-3xl -mr-4 -mt-4 transition-transform group-hover:scale-150 duration-700"></div>
+                            <h3 className="text-lg font-bold mb-3 text-foreground relative z-10 flex items-start gap-2">
+                                <UploadCloud size={20} className="text-purple-500 shrink-0 mt-0.5" />
                                 Can I self-host S4?
-                                <ChevronRight size={20} className="transform group-open:rotate-90 transition-transform text-muted-foreground" />
-                            </summary>
-                            <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
-                                Absolutely. S4 is a static web application. Simply run <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">npm run build</code> and deploy the <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">dist/</code> folder to any static hosting service or web server.
+                            </h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed relative z-10">
+                                Absolutely. Run <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">npm run build</code> and deploy the dist folder to any static hosting service or web server.
                             </p>
-                        </details>
+                        </div>
 
-                        <details className="group p-6 rounded-xl border border-border bg-card/30 backdrop-blur-sm cursor-pointer">
-                            <summary className="font-semibold text-lg list-none flex items-center justify-between">
-                                What IAM permissions do I need?
-                                <ChevronRight size={20} className="transform group-open:rotate-90 transition-transform text-muted-foreground" />
-                            </summary>
-                            <div className="mt-4 text-sm text-muted-foreground leading-relaxed space-y-2">
-                                <p>For full functionality, you need these S3 permissions:</p>
-                                <ul className="list-disc list-inside space-y-1 ml-4">
-                                    <li><code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">s3:ListAllMyBuckets</code> - List all buckets</li>
-                                    <li><code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">s3:ListBucket</code> - View bucket contents</li>
-                                    <li><code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">s3:GetObject</code> - Download and preview files</li>
-                                    <li><code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">s3:PutObject</code> - Upload files</li>
-                                    <li><code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">s3:DeleteObject</code> - Delete files</li>
-                                </ul>
-                                <p className="mt-2">You can also enable read-only mode if you only have <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">ListBucket</code> and <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">GetObject</code> permissions.</p>
-                            </div>
-                        </details>
+                        <div className="group p-6 rounded-2xl bg-card/50 border border-border hover:border-foreground/20 hover:bg-card transition-all duration-300 backdrop-blur-sm cursor-default relative overflow-hidden shadow-sm">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-yellow-500/10 to-transparent rounded-bl-3xl -mr-4 -mt-4 transition-transform group-hover:scale-150 duration-700"></div>
+                            <h3 className="text-lg font-bold mb-3 text-foreground relative z-10 flex items-start gap-2">
+                                <Settings size={20} className="text-yellow-500 shrink-0 mt-0.5" />
+                                What permissions do I need?
+                            </h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed relative z-10">
+                                For full functionality: ListBucket, GetObject, PutObject, DeleteObject. For read-only mode, just ListBucket and GetObject are sufficient.
+                            </p>
+                        </div>
 
-                        <details className="group p-6 rounded-xl border border-border bg-card/30 backdrop-blur-sm cursor-pointer">
-                            <summary className="font-semibold text-lg list-none flex items-center justify-between">
+                        <div className="group p-6 rounded-2xl bg-card/50 border border-border hover:border-foreground/20 hover:bg-card transition-all duration-300 backdrop-blur-sm cursor-default relative overflow-hidden shadow-sm md:col-span-2">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-orange-500/10 to-transparent rounded-bl-3xl -mr-4 -mt-4 transition-transform group-hover:scale-150 duration-700"></div>
+                            <h3 className="text-lg font-bold mb-3 text-foreground relative z-10 flex items-start gap-2">
+                                <Globe size={20} className="text-orange-500 shrink-0 mt-0.5" />
                                 Do I need to configure CORS?
-                                <ChevronRight size={20} className="transform group-open:rotate-90 transition-transform text-muted-foreground" />
-                            </summary>
-                            <div className="mt-4 text-sm text-muted-foreground leading-relaxed">
-                                <p className="mb-2">Yes, because S4 runs in your browser, you need to configure CORS on your S3 bucket to allow browser access. Add this policy to your bucket's CORS configuration:</p>
-                                <pre className="p-3 rounded bg-secondary text-xs font-mono overflow-x-auto">{`[
+                            </h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed relative z-10 mb-3">
+                                Yes, because S4 runs in your browser, you need to configure CORS on your S3 bucket. Add this policy to allow browser access:
+                            </p>
+                            <pre className="text-xs font-mono bg-secondary p-3 rounded overflow-x-auto relative z-10">{`[
   {
     "AllowedHeaders": ["*"],
     "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
@@ -518,8 +492,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
     "ExposeHeaders": ["ETag"]
   }
 ]`}</pre>
-                            </div>
-                        </details>
+                        </div>
                     </div>
                 </div>
 
