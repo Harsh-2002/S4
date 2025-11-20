@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#16181D" />
+
+  <!-- SEO & Metadata -->
+  <title>S4 - Modern S3 Storage Explorer</title>
+  <meta name="description"
+    content="The modern interface for your cloud storage. A high-performance, client-side S3 explorer for AWS S3, Cloudflare R2, and MinIO with end-to-end encryption. Open source and secure." />
+  <meta name="keywords"
+    content="S3, Storage Explorer, AWS S3, Cloudflare R2, MinIO, Object Storage, File Manager, Client-side, Encryption, Open Source, Web Interface" />
+  <meta name="author" content="S4" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://s4.ctl.qzz.io" />
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://s4.ctl.qzz.io" />
+  <meta property="og:title" content="S4 - Modern S3 Storage Explorer" />
+  <meta property="og:description"
+    content="The modern interface for your cloud storage. Secure, fast, and serverless management for your S3 buckets." />
+  <meta property="og:site_name" content="S4" />
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://s4.ctl.qzz.io" />
+  <meta property="twitter:title" content="S4 - Modern S3 Storage Explorer" />
+  <meta property="twitter:description"
+    content="The modern interface for your cloud storage. Secure, fast, and serverless management for your S3 buckets." />
+
+  <!-- PWA & Icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="https://cdn.lucide.dev/icon/database.svg">
+  <link rel="manifest"
+    href='data:application/manifest+json,{"name":"S4 Storage","short_name":"S4","start_url":"/","display":"standalone","background_color":"#16181D","theme_color":"#16181D","icons":[{"src":"https://cdn.lucide.dev/icon/database.svg","sizes":"192x192","type":"image/svg+xml"},{"src":"https://cdn.lucide.dev/icon/database.svg","sizes":"512x512","type":"image/svg+xml"}]}'>
+
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['Roboto Mono', 'monospace'],
+          },
+          colors: {
+            border: "hsl(var(--border))",
+            input: "hsl(var(--input))",
+            ring: "hsl(var(--ring))",
+            background: "hsl(var(--background))",
+            foreground: "hsl(var(--foreground))",
+            primary: {
+              DEFAULT: "hsl(var(--primary))",
+              foreground: "hsl(var(--primary-foreground))",
+            },
+            secondary: {
+              DEFAULT: "hsl(var(--secondary))",
+              foreground: "hsl(var(--secondary-foreground))",
+            },
+            destructive: {
+              DEFAULT: "hsl(var(--destructive))",
+              foreground: "hsl(var(--destructive-foreground))",
+            },
+            muted: {
+              DEFAULT: "hsl(var(--muted))",
+              foreground: "hsl(var(--muted-foreground))",
+            },
+            accent: {
+              DEFAULT: "hsl(var(--accent))",
+              foreground: "hsl(var(--accent-foreground))",
+            },
+            popover: {
+              DEFAULT: "hsl(var(--popover))",
+              foreground: "hsl(var(--popover-foreground))",
+            },
+            card: {
+              DEFAULT: "hsl(var(--card))",
+              foreground: "hsl(var(--card-foreground))",
+            },
+          },
+          borderRadius: {
+            lg: "var(--radius)",
+            md: "calc(var(--radius) - 2px)",
+            sm: "calc(var(--radius) - 4px)",
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
+
+    :root {
+      /* Light Mode (Default) */
+      --background: 0 0% 100%;
+      /* White */
+      --foreground: 240 10% 3.9%;
+      /* Zinc 950 */
+
+      --card: 0 0% 100%;
+      --card-foreground: 240 10% 3.9%;
+
+      --popover: 0 0% 100%;
+      --popover-foreground: 240 10% 3.9%;
+
+      --primary: 240 5.9% 10%;
+      /* Zinc 900 */
+      --primary-foreground: 0 0% 98%;
+      /* Zinc 50 */
+
+      --secondary: 240 4.8% 95.9%;
+      /* Zinc 100 */
+      --secondary-foreground: 240 5.9% 10%;
+
+      --muted: 240 4.8% 95.9%;
+      /* Zinc 100 */
+      --muted-foreground: 240 3.8% 46.1%;
+      /* Zinc 500 */
+
+      --accent: 240 4.8% 95.9%;
+      --accent-foreground: 240 5.9% 10%;
+
+      --destructive: 0 84.2% 60.2%;
+      --destructive-foreground: 0 0% 98%;
+
+      --border: 240 5.9% 90%;
+      /* Zinc 200 */
+      --input: 240 5.9% 90%;
+      --ring: 240 10% 3.9%;
+
+      --radius: 0.5rem;
+    }
+
+    .dark {
+      /* Premium Charcoal Theme (Dark Mode) */
+      /* Base Hue: 220 (Cool Blue/Grey) */
+      --background: 224 14% 10%;
+      /* #16181D */
+      --foreground: 210 40% 98%;
+
+      --card: 224 14% 12%;
+      --card-foreground: 210 40% 98%;
+
+      --popover: 224 14% 12%;
+      --popover-foreground: 210 40% 98%;
+
+      --primary: 210 40% 98%;
+      --primary-foreground: 222 47.4% 11.2%;
+
+      --secondary: 224 10% 18%;
+      --secondary-foreground: 210 40% 98%;
+
+      --muted: 224 10% 18%;
+      --muted-foreground: 215 20.2% 65.1%;
+
+      --accent: 224 10% 18%;
+      --accent-foreground: 210 40% 98%;
+
+      --destructive: 0 62.8% 30.6%;
+      --destructive-foreground: 210 40% 98%;
+
+      --border: 224 10% 22%;
+      --input: 224 10% 22%;
+      --ring: 224 14% 40%;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Mobile tap highlight removal */
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Safe area padding for notched devices */
+    .safe-area-inset-top {
+      padding-top: env(safe-area-inset-top);
+    }
+
+    /* Custom scrollbar for that sleek feel */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: hsl(var(--border));
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: hsl(var(--muted-foreground));
+    }
+  </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "@aws-sdk/s3-request-presigner": "https://esm.sh/@aws-sdk/s3-request-presigner@3.620.1?target=es2022&platform=browser&bundle=true",
+    "@aws-sdk/client-s3": "https://esm.sh/@aws-sdk/client-s3@3.620.1?target=es2022&platform=browser&bundle=true",
+    "@aws-sdk/lib-storage": "https://esm.sh/@aws-sdk/lib-storage@3.620.1?target=es2022&platform=browser&bundle=true",
+    "jszip": "https://esm.sh/jszip@3.10.1",
+    "marked": "https://esm.sh/marked@12.0.0",
+    "dompurify": "https://esm.sh/dompurify@3.0.9"
+  }
+}
+</script>
+  <link rel="stylesheet" href="/index.css">
+</head>
+
+<body class="bg-background text-foreground antialiased selection:bg-blue-500/30 transition-colors duration-300">
+  <div id="root" class="h-full w-full"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>

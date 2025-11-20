@@ -1,0 +1,5 @@
+{
+  "name": "S4",
+  "description": "The modern interface for your cloud storage. High-performance, client-side S3 explorer for AWS, R2, and MinIO.",
+  "requestFramePermissions": []
+}
