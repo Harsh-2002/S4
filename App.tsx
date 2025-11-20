@@ -43,6 +43,22 @@ const App = () => {
         loadProfiles();
     }, []);
 
+    // Update theme-color meta tag based on view
+    useEffect(() => {
+        const metaThemeColorLight = document.querySelector('meta[name="theme-color"][media="(prefers-color-scheme: light)"]');
+        const metaThemeColorDark = document.querySelector('meta[name="theme-color"][media="(prefers-color-scheme: dark)"]');
+
+        if (view === 'landing') {
+            // Bluish tint for landing page (matches hero section ambient light)
+            metaThemeColorLight?.setAttribute('content', '#e8f0ff');
+            metaThemeColorDark?.setAttribute('content', '#0f1318');
+        } else {
+            // Normal background colors for app
+            metaThemeColorLight?.setAttribute('content', '#ffffff');
+            metaThemeColorDark?.setAttribute('content', '#16181D');
+        }
+    }, [view]);
+
     // Load Profiles from Local Storage
     const loadProfiles = async () => {
         const saved = localStorage.getItem(PROFILES_KEY);

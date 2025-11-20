@@ -15,7 +15,7 @@ interface LandingProps {
 
 const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
     return (
-        <div className="min-h-screen w-full bg-background text-foreground font-sans flex flex-col relative overflow-y-auto scroll-smooth selection:bg-blue-500/30 transition-colors duration-300">
+        <div className="min-h-screen w-full bg-background text-foreground font-sans flex flex-col relative overflow-y-auto overflow-x-hidden scroll-smooth selection:bg-blue-500/30 transition-colors duration-300">
             {/* Animation Styles */}
             <style>{`
         @keyframes grid-move {
@@ -30,8 +30,11 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
         }
       `}</style>
 
+            {/* Top Blur Gradient (Mobile Only) */}
+            <div className="md:hidden absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-background via-background to-transparent z-0"></div>
+
             {/* Decorative Grids with Animation - Adaptive */}
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.05)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_0%,#000_60%,transparent_100%)] pointer-events-none animate-grid z-0"></div>
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.05)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_0%,#000_60%,transparent_100%)] md:[mask-image:radial-gradient(ellipse_80%_60%_at_50%_0%,#000_60%,transparent_100%)] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_60%,transparent_100%)] pointer-events-none animate-grid z-0"></div>
 
             {/* Top Ambient Light */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-blue-600/20 blur-[100px] rounded-full pointer-events-none z-0 mix-blend-multiply dark:mix-blend-screen opacity-50 dark:opacity-100"></div>
@@ -82,13 +85,14 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                 </div>
 
                 {/* UI Illustration / Mockup */}
-                <div className="w-full max-w-6xl mt-4 mb-32 perspective-container group relative px-2 md:px-0">
+                <div className="w-full max-w-6xl mt-4 mb-8 md:mb-32 perspective-container group relative px-2 md:px-0 overflow-hidden">
 
                     {/* Dynamic Interactive Glow Background */}
                     <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 rounded-[1.5rem] blur-2xl opacity-50 group-hover:opacity-75 transition-all duration-700 will-change-transform"></div>
 
                     {/* Main Window Container */}
-                    <div className="relative rounded-xl bg-background dark:bg-[#0F1115] border border-border shadow-2xl overflow-hidden transform transition-all duration-500 ease-out group-hover:shadow-blue-500/20 ring-1 ring-border group-hover:ring-blue-500/30">
+                    {/* Desktop: Interactive HTML Mockup */}
+                    <div className="hidden md:block relative rounded-xl bg-background dark:bg-[#0F1115] border border-border shadow-2xl overflow-hidden transition-all duration-500 ease-out group-hover:shadow-blue-500/20 ring-1 ring-border group-hover:ring-blue-500/30">
 
                         {/* Mockup Header */}
                         <div className="h-12 bg-secondary/30 dark:bg-[#16181D] border-b border-border flex items-center px-4 justify-between shrink-0 select-none">
@@ -100,7 +104,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                             </div>
 
                             {/* Search Bar */}
-                            <div className="flex-1 max-w-xl mx-4 hidden sm:block">
+                            <div className="flex-1 max-w-xl mx-4">
                                 <div className="w-full bg-background dark:bg-[#0A0B0E] border border-border dark:border-white/5 rounded-md h-8 flex items-center px-3 gap-2 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-all cursor-text group/search shadow-inner">
                                     <Search size={12} className="text-muted-foreground/70 group-hover/search:text-muted-foreground transition-colors" />
                                     <span className="flex-1">Search files...</span>
@@ -124,7 +128,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                         <div className="flex h-[350px] sm:h-[450px] md:h-[600px] bg-background dark:bg-[#0F1115] relative text-left">
 
                             {/* Sidebar (Hidden on Mobile) */}
-                            <div className="w-60 border-r border-border bg-secondary/10 dark:bg-[#121418] flex flex-col hidden md:flex shrink-0">
+                            <div className="w-60 border-r border-border bg-secondary/10 dark:bg-[#121418] flex flex-col shrink-0">
                                 <div className="p-4 space-y-6">
                                     {/* Favorites */}
                                     <div>
