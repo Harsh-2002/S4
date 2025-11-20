@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { S3Service, formatBytes } from '../services/s3Service';
 import { BucketObject } from '../types';
 import { Database, Loader2, Search, RefreshCw, Plus, Trash2, X, AlertTriangle, Cloud, CloudLightning, Server, Globe, AlertCircle, HardDrive } from 'lucide-react';
+import { useSafeArea } from '../hooks/useSafeArea';
 
 interface BucketListProps {
     s3: S3Service;
@@ -12,6 +13,7 @@ interface BucketListProps {
 }
 
 const BucketList: React.FC<BucketListProps> = ({ s3, selectedBucket, onSelectBucket, provider }) => {
+    const safeArea = useSafeArea();
     const [buckets, setBuckets] = useState<BucketObject[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<{ message: string, detail?: string } | null>(null);
@@ -23,9 +25,7 @@ const BucketList: React.FC<BucketListProps> = ({ s3, selectedBucket, onSelectBuc
     const [deleteConfirmation, setDeleteConfirmation] = useState<{ show: boolean, name: string | null }>({ show: false, name: null });
     const [actionLoading, setActionLoading] = useState(false);
 
-    // Storage tracking
-    const [totalStorage, setTotalStorage] = useState<number | null>(null);
-    const [storageLoading, setStorageLoading] = useState(false);
+
 
     // Pull-to-refresh state
     const [isPulling, setIsPulling] = useState(false);
@@ -88,40 +88,13 @@ const BucketList: React.FC<BucketListProps> = ({ s3, selectedBucket, onSelectBuc
         }
     };
 
-    // Calculate total storage across all accessible buckets
-    const calculateTotalStorage = async () => {
-        setStorageLoading(true);
-        try {
-            let total = 0;
-            // Try to calculate for each bucket, skip if permission denied
-            for (const bucket of buckets) {
-                try {
-                    const size = await s3.getBucketSize(bucket.name);
-                    total += size;
-                } catch (err: any) {
-                    // Skip buckets we don't have permission to access
-                    console.warn(`Cannot calculate size for ${bucket.name}:`, err.message);
-                }
-            }
-            setTotalStorage(total);
-        } catch (err) {
-            console.error('Error calculating storage:', err);
-            setTotalStorage(null);
-        } finally {
-            setStorageLoading(false);
-        }
-    };
+
 
     useEffect(() => {
         loadBuckets();
     }, []);
 
-    // Calculate storage when buckets change
-    useEffect(() => {
-        if (buckets.length > 0 && !error) {
-            calculateTotalStorage();
-        }
-    }, [buckets]);
+
 
     const handleCreateBucket = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -260,7 +233,10 @@ const BucketList: React.FC<BucketListProps> = ({ s3, selectedBucket, onSelectBuc
             )}
 
             {/* Sidebar Header */}
-            <div className="p-4 border-b border-border bg-background/50 sticky top-0 z-10 backdrop-blur-sm">
+            <div
+                className="p-4 border-b border-border bg-background/50 sticky top-0 z10 backdrop-blur-sm"
+                style={{ paddingTop: `${Math.max(16, safeArea.top)}px` }}
+            >
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                         <ProviderIcon size={14} className="text-foreground/70" />
@@ -370,34 +346,7 @@ const BucketList: React.FC<BucketListProps> = ({ s3, selectedBucket, onSelectBuc
                 )}
             </div>
 
-            {/* Storage Summary - Sticky on mobile */}
-            {!error && buckets.length > 0 && (
-                <div className="p-4 border-t border-border bg-background/95 backdrop-blur-sm md:bg-background/50 sticky bottom-0 md:relative">
-                    <div className="bg-card dark:bg-[#16181D] rounded-lg p-3 border border-border shadow-inner group/storage hover:border-foreground/20 transition-colors">
-                        <div className="flex justify-between items-center text-[10px] text-muted-foreground mb-2">
-                            <div className="flex items-center gap-1.5">
-                                <HardDrive size={12} className="text-foreground/70" />
-                                <span>Total Storage</span>
-                            </div>
-                            {storageLoading ? (
-                                <Loader2 size={10} className="animate-spin text-muted-foreground" />
-                            ) : totalStorage !== null ? (
-                                <span className="text-foreground font-medium">{formatBytes(totalStorage)}</span>
-                            ) : (
-                                <span className="text-muted-foreground">—</span>
-                            )}
-                        </div>
-                        {totalStorage !== null && !storageLoading && (
-                            <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.4)] transition-all duration-500"
-                                    style={{ width: `${Math.min((totalStorage / (1024 * 1024 * 1024 * 100)) * 100, 100)}%` }}
-                                ></div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
+
         </div>
     );
 };

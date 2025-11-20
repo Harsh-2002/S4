@@ -8,12 +8,14 @@ import {
     Star, Clock, HardDrive, MoreVertical, List, Filter, Code2,
     Smartphone, WifiOff, Download, Heart
 } from 'lucide-react';
+import { useSafeArea } from '../hooks/useSafeArea';
 
 interface LandingProps {
     onGetStarted: () => void;
 }
 
 const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
+    const safeArea = useSafeArea();
     return (
         <div className="min-h-screen w-full bg-background text-foreground font-sans flex flex-col relative overflow-y-auto overflow-x-hidden scroll-smooth selection:bg-blue-500/30 transition-colors duration-300">
             {/* Animation Styles */}
@@ -39,7 +41,10 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
             {/* Top Ambient Light */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-blue-600/20 blur-[100px] rounded-full pointer-events-none z-0 mix-blend-multiply dark:mix-blend-screen opacity-50 dark:opacity-100"></div>
 
-            <main className="flex-1 flex flex-col items-center justify-start text-center z-10 pt-20 pb-20 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <main
+                className="flex-1 flex flex-col items-center justify-start text-center z-10 pt-20 pb-20 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+                style={{ paddingTop: `${Math.max(80, 80 + safeArea.top)}px`, paddingBottom: `${Math.max(80, 80 + safeArea.bottom)}px` }}
+            >
 
                 {/* Header Section */}
                 <div className="flex flex-col items-center gap-8 mb-16 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -169,18 +174,6 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                                                 <Globe size={14} className="text-muted-foreground group-hover/nav:text-foreground" />
                                                 public-cdn
                                             </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-auto p-4 border-t border-border">
-                                    <div className="bg-card dark:bg-[#0A0B0E] rounded-lg p-3 border border-border shadow-inner group/storage hover:border-foreground/20 transition-colors">
-                                        <div className="flex justify-between text-[10px] text-muted-foreground mb-2">
-                                            <span>Storage Used</span>
-                                            <span className="text-foreground">420 GB</span>
-                                        </div>
-                                        <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                                            <div className="h-full w-[65%] bg-gradient-to-r from-blue-600 to-blue-400 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.4)] group-hover/storage:w-[67%] transition-all duration-500"></div>
                                         </div>
                                     </div>
                                 </div>

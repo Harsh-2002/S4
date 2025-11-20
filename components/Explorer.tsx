@@ -1,19 +1,31 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { FileObject, ViewMode, BucketObject } from '../types';
-import { S3Service, formatBytes } from '../services/s3Service';
 import {
-    Folder, File as FileIcon, Upload,
-    Grid, List, Search, ChevronRight, Download, Trash2,
-    Image as ImageIcon, FileText, ArrowLeft, Loader2, Eye,
-    FolderPlus, RefreshCw, Film, Music, FileCode, Package, Database,
-    X, FileJson, FileSpreadsheet, Terminal, Binary, AlertTriangle, AlertCircle,
-    Archive, Check, Share2, ChevronLeft, ChevronRight as ChevronRightIcon, Edit2, Save,
-    PenTool, BookOpen, CheckSquare, MousePointer2, CheckCircle2, FilePlus, ShieldAlert, Lock,
-    Link, Move, FolderInput, Copy, TerminalSquare, HardDrive, UploadCloud
+    Folder, FileText, Image as ImageIcon, Music, Video, Code, Archive,
+    MoreVertical, Download, Trash2, Share2, ChevronRight, Home,
+    ArrowLeft, Search, X, Upload, Check, Loader2, Copy,
+    ChevronLeft, ChevronRight as ChevronRightIcon, Edit2, Save,
+    Database, FilePlus, Move, CheckSquare, Link, Eye,
+    Film, Package, FileCode, File as FileIcon, RefreshCw, List, Grid,
+    AlertTriangle, AlertCircle, PenTool, BookOpen, MousePointer2, CheckCircle2,
+    ShieldAlert, Lock, FolderInput, TerminalSquare, HardDrive, UploadCloud,
+    FileJson, FileSpreadsheet, Terminal, Binary
 } from 'lucide-react';
-import { parse } from 'marked';
+import { S3Service, formatBytes } from '../services/s3Service';
+import { FileObject, BucketObject, ViewMode } from '../types';
+import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import BottomSheet from './BottomSheet';
+import SwipeableListItem from './SwipeableListItem';
+import ImagePreview from './ImagePreview';
+import { useIsMobile } from '../hooks/useIsMobile';
+import { useSwipeGesture } from '../hooks/useSwipeGesture';
+import { usePinchZoom } from '../hooks/usePinchZoom';
+import { useEdgeSwipe } from '../hooks/useEdgeSwipe';
+import { useSafeArea } from '../hooks/useSafeArea';
+import { useDebounce } from '../hooks/useDebounce';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useLongPressDrag } from '../hooks/useLongPressDrag';
 
 interface ExplorerProps {
     s3: S3Service;
@@ -69,10 +81,58 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
     const [files, setFiles] = useState<FileObject[]>([]);
     const [loading, setLoading] = useState(false);
     const [viewError, setViewError] = useState<{ title: string, message: string, code?: string, docLink?: string, details?: string } | null>(null);
+    const [editorPreviewHtml, setEditorPreviewHtml] = useState('');
 
+    const isMobile = useIsMobile();
+
+    // Edge swipe for back navigation
+    const { handlers: edgeSwipeHandlers, swipeProgress, isEdgeSwipe } = useEdgeSwipe({
+        onSwipeComplete: () => {
+            if (currentPrefix) {
+                handleUp();
+            } else if (onBackToBuckets) {
+                onBackToBuckets();
+            }
+        },
+        enabled: isMobile
+    });
+
+    // Initialize S3 and load files, setViewMode] = useState<ViewMode>(ViewMode.LIST);
     const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.LIST);
-    const [search, setSearch] = useState('');
+    const [searchInput, setSearchInput] = useState('');
+    const search = useDebounce(searchInput, 300); // Debounced search
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // Safe area insets
+    const safeArea = useSafeArea();
+
+    // Long-press drag for mobile
+    const { dragState, handlers: dragHandlers, setDropTarget } = useLongPressDrag({
+        onDragStart: (file) => {
+            console.log('Drag started:', file.name);
+        },
+        onDragEnd: async (file, targetFolder) => {
+            if (targetFolder && targetFolder.isFolder) {
+                // Move file to folder
+                setProcessingState(`Moving ${file.name}...`);
+                try {
+                    const newKey = `${targetFolder.key}${file.name}`;
+                    if (file.isFolder) {
+                        await s3.moveFolder(bucketName, file.key, bucketName, newKey);
+                    } else {
+                        await s3.moveObject(bucketName, file.key, bucketName, newKey);
+                    }
+                    setRefreshTrigger(p => p + 1);
+                    setNotification(`Moved ${file.name} to ${targetFolder.name}`);
+                } catch (e) {
+                    console.error('Move failed:', e);
+                    setNotification('Move failed');
+                } finally {
+                    setProcessingState(null);
+                }
+            }
+        }
+    });
 
     // Preview
     const [previewFile, setPreviewFile] = useState<{ file: FileObject, url: string, content?: string } | null>(null);
@@ -109,10 +169,6 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
     const [processingState, setProcessingState] = useState<string | null>(null);
     const [notification, setNotification] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Storage tracking
-    const [bucketStorage, setBucketStorage] = useState<number | null>(null);
-    const [storageLoading, setStorageLoading] = useState(false);
 
     // Pull to refresh
     const [isPulling, setIsPulling] = useState(false);
@@ -153,24 +209,6 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         setSelectedKeys(new Set());
         setSelectionMode(false);
         setViewError(null);
-    }, [bucketName]);
-
-    // Calculate bucket storage when bucket changes
-    useEffect(() => {
-        const calculateStorage = async () => {
-            setStorageLoading(true);
-            try {
-                const size = await s3.getBucketSize(bucketName);
-                setBucketStorage(size);
-            } catch (err) {
-                console.warn('Could not calculate bucket storage:', err);
-                setBucketStorage(null);
-            } finally {
-                setStorageLoading(false);
-            }
-        };
-
-        calculateStorage();
     }, [bucketName]);
 
     useEffect(() => {
@@ -259,7 +297,7 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
 
     const handleNavigate = (prefix: string) => {
         setCurrentPrefix(prefix);
-        setSearch('');
+        setSearchInput('');
         // Always clear selection on navigation
         setSelectedKeys(new Set());
     };
@@ -553,6 +591,21 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
     };
 
     // Preview & Editing
+    // Update editor preview when tab changes or content changes
+    useEffect(() => {
+        const updatePreview = async () => {
+            if (mdTab === 'preview' && isEditing) {
+                try {
+                    const html = await marked.parse(editorContent);
+                    setEditorPreviewHtml(html);
+                } catch (e) {
+                    console.error("Failed to parse markdown", e);
+                }
+            }
+        };
+        updatePreview();
+    }, [mdTab, isEditing, editorContent]);
+
     const handlePreview = async (file: FileObject) => {
         if (file.isFolder) return;
         setIsPreviewLoading(true);
@@ -564,7 +617,29 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
             const url = await s3.getPresignedUrl(file.key);
             let content = undefined;
 
-            if (file.mimeType?.match(/text|json|javascript|xml|sql|css|html|md/) || file.name.endsWith('.md')) {
+            if (file.name.endsWith('.md')) {
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const text = await res.text();
+                        const html = await marked.parse(text);
+                        setPreviewFile({ file, url, content: html });
+                    }
+                } catch (e) {
+                    console.error("Could not fetch markdown content", e);
+                }
+            } else if (file.name.endsWith('.json') || file.name.endsWith('.js') || file.name.endsWith('.ts') || file.name.endsWith('.tsx')) {
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        content = await res.text();
+                        setEditorContent(content);
+                    }
+                } catch (e) {
+                    console.error("Could not fetch code content", e);
+                }
+                setPreviewFile({ file, url, content });
+            } else if (file.mimeType?.match(/text|json|javascript|xml|sql|css|html/)) {
                 try {
                     const res = await fetch(url);
                     if (res.ok) {
@@ -574,8 +649,25 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                 } catch (e) {
                     console.error("Could not fetch text content", e);
                 }
+                setPreviewFile({ file, url, content });
+            } else if (file.mimeType === 'application/pdf' || file.name.endsWith('.pdf')) {
+                // Fetch PDF as blob to bypass X-Frame-Options
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const blob = await res.blob();
+                        const blobUrl = URL.createObjectURL(blob);
+                        setPreviewFile({ file, url: blobUrl, content });
+                    } else {
+                        setPreviewFile({ file, url, content });
+                    }
+                } catch (e) {
+                    console.error("Could not fetch PDF", e);
+                    setPreviewFile({ file, url, content });
+                }
+            } else {
+                setPreviewFile({ file, url, content });
             }
-            setPreviewFile({ file, url, content });
         } catch (e) {
             // If getting presigned URL fails (likely 403)
             const errInfo = getAwsErrorMessage(e);
@@ -611,7 +703,12 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         setProcessingState("Saving changes...");
         try {
             await s3.saveFileContent(previewFile.file.key, editorContent, previewFile.file.mimeType);
-            setPreviewFile(prev => prev ? { ...prev, content: editorContent } : null);
+            if (previewFile?.file.name.endsWith('.md')) {
+                const html = await marked.parse(editorContent);
+                setPreviewFile(prev => prev ? { ...prev, content: html } : null);
+            } else {
+                setPreviewFile(prev => prev ? { ...prev, content: editorContent } : null);
+            }
             setIsEditing(false);
             setRefreshTrigger(p => p + 1);
         } catch (e: any) {
@@ -682,7 +779,7 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                     <div className="w-full h-full bg-background overflow-auto p-8 transition-colors">
                         <div
                             className="prose dark:prose-invert prose-sm max-w-3xl mx-auto"
-                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parse(editorContent) as string) }}
+                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(editorPreviewHtml) }}
                         />
                     </div>
                 );
@@ -705,16 +802,25 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                         </div>
                     </div>
 
-                    <textarea
-                        className="flex-1 h-full bg-background text-foreground text-sm p-4 outline-none resize-none transition-colors leading-6 whitespace-pre"
-                        value={editorContent}
-                        onChange={(e) => setEditorContent(e.target.value)}
-                        onScroll={(e) => setEditorScrollTop(e.currentTarget.scrollTop)}
-                        spellCheck={false}
-                        placeholder="Start typing..."
-                        autoFocus
-                        wrap="off"
-                    />
+                    {isMarkdown && mdTab === 'preview' ? (
+                        <div className="flex-1 h-full bg-background overflow-auto p-8 transition-colors">
+                            <div
+                                className="prose dark:prose-invert prose-sm max-w-3xl mx-auto"
+                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(editorPreviewHtml) }}
+                            />
+                        </div>
+                    ) : (
+                        <textarea
+                            className="flex-1 h-full bg-background text-foreground text-sm p-4 outline-none resize-none transition-colors leading-6 whitespace-pre"
+                            value={editorContent}
+                            onChange={(e) => setEditorContent(e.target.value)}
+                            onScroll={(e) => setEditorScrollTop(e.currentTarget.scrollTop)}
+                            spellCheck={false}
+                            placeholder="Start typing..."
+                            autoFocus
+                            wrap="off"
+                        />
+                    )}
                 </div>
             );
         }
@@ -727,7 +833,7 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                     <div className="w-full h-full bg-background overflow-auto p-8 transition-colors">
                         <div
                             className="prose dark:prose-invert prose-sm max-w-3xl mx-auto"
-                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parse(previewFile.content) as string) }}
+                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewFile.content) }}
                         />
                     </div>
                 );
@@ -744,15 +850,28 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         return (
             <div className="w-full h-full flex items-center justify-center p-4 bg-secondary/10 transition-colors">
                 {previewFile.file.mimeType?.startsWith('image') ? (
-                    <img src={previewFile.url} alt="Preview" className="max-w-full max-h-full object-contain shadow-2xl rounded-sm" />
+                    <ImagePreview
+                        src={previewFile.url}
+                        alt="Preview"
+                        onSwipeLeft={() => navigatePreview(1)}
+                        onSwipeRight={() => navigatePreview(-1)}
+                        onClose={closePreview}
+                    />
                 ) : previewFile.file.mimeType?.startsWith('video') ? (
                     <video src={previewFile.url} controls className="max-w-full max-h-full shadow-2xl rounded-sm" />
                 ) : previewFile.file.mimeType?.startsWith('audio') ? (
                     <audio src={previewFile.url} controls className="w-full max-w-md" />
+                ) : previewFile.file.mimeType === 'application/pdf' || previewFile.file.name.endsWith('.pdf') ? (
+                    <iframe
+                        src={previewFile.url}
+                        className="w-full h-full border-0 rounded-sm shadow-2xl"
+                        title="PDF Preview"
+                    />
                 ) : (
                     <div className="text-center text-muted-foreground">
                         <FileIcon size={64} className="mx-auto mb-4 opacity-20" />
-                        <p>No preview available</p>
+                        <p className="mb-2">{previewFile.file.name}</p>
+                        <p className="text-xs mb-4">Preview not available for this file type</p>
                         <button onClick={() => handleDownload(previewFile.file)} className="mt-4 text-blue-500 hover:underline text-sm">Download File</button>
                     </div>
                 )}
@@ -763,7 +882,37 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
     return (
         <div
             className="flex flex-col h-full relative bg-background select-none transition-colors duration-300"
+            {...edgeSwipeHandlers}
         >
+            {/* Edge Swipe Back Indicator */}
+            {isEdgeSwipe && (
+                <div className="fixed left-0 top-0 bottom-0 z-[200] flex items-center justify-start pl-4 pointer-events-none bg-gradient-to-r from-black/10 to-transparent w-24 transition-opacity" style={{ opacity: swipeProgress }}>
+                    <div className="bg-background/80 backdrop-blur-md rounded-full p-3 shadow-lg border border-border transform transition-transform" style={{ transform: `scale(${0.5 + swipeProgress * 0.5})` }}>
+                        <ArrowLeft size={24} className="text-foreground" />
+                    </div>
+                </div>
+            )}
+
+            {/* Drag Preview */}
+            {dragState.isDragging && dragState.draggedFile && (
+                <div
+                    className="fixed z-[250] pointer-events-none"
+                    style={{
+                        left: `${dragState.dragPosition.x}px`,
+                        top: `${dragState.dragPosition.y}px`,
+                        transform: 'translate(-50%, -50%)'
+                    }}
+                >
+                    <div className="bg-background/90 backdrop-blur-md border-2 border-primary rounded-xl p-3 shadow-2xl flex items-center gap-3 animate-pulse">
+                        <div className="text-primary">
+                            {getIcon(dragState.draggedFile, 24)}
+                        </div>
+                        <span className="font-medium text-sm max-w-[200px] truncate">
+                            {dragState.draggedFile.name}
+                        </span>
+                    </div>
+                </div>
+            )}
             {/* Toast Notification */}
             {notification && (
                 <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[150] animate-in slide-in-from-top-4 fade-in duration-300">
@@ -832,55 +981,111 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
             )}
 
             {/* Move Modal */}
+            {/* Move Modal */}
             {moveModal.show && (
-                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setMoveModal({ ...moveModal, show: false })}>
-                    <div className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
-                                <FolderInput className="text-blue-500 w-5 h-5" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold">Move Items</h3>
-                                <p className="text-xs text-muted-foreground">Moving {selectedKeys.size} items</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4 mb-6">
-                            <div>
-                                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Destination Bucket</label>
-                                <select
-                                    className="w-full bg-secondary border border-input rounded-md px-3 py-2 text-sm outline-none focus:border-foreground"
-                                    value={moveModal.targetBucket}
-                                    onChange={(e) => setMoveModal({ ...moveModal, targetBucket: e.target.value })}
-                                >
-                                    {moveModal.bucketList.map(b => (
-                                        <option key={b.name} value={b.name}>{b.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Destination Folder Path</label>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        className="w-full bg-secondary border border-input rounded-md pl-8 pr-3 py-2 text-sm outline-none focus:border-foreground font-mono"
-                                        placeholder="folder/subfolder/"
-                                        value={moveModal.targetPrefix}
-                                        onChange={(e) => setMoveModal({ ...moveModal, targetPrefix: e.target.value })}
-                                    />
-                                    <Folder size={14} className="absolute left-2.5 top-2.5 text-muted-foreground" />
+                isMobile ? (
+                    <BottomSheet
+                        isOpen={moveModal.show}
+                        onClose={() => setMoveModal({ ...moveModal, show: false })}
+                        title="Move Items"
+                        height="auto"
+                    >
+                        <div className="space-y-6 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                                    <FolderInput className="text-blue-500 w-6 h-6" />
                                 </div>
-                                <p className="text-[10px] text-muted-foreground mt-1">Leave empty to move to root. Use trailing slash for folders.</p>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Moving {selectedKeys.size} items</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-medium text-muted-foreground block mb-2">Destination Bucket</label>
+                                    <select
+                                        className="w-full bg-secondary border border-input rounded-xl px-4 py-3 text-sm outline-none appearance-none"
+                                        value={moveModal.targetBucket}
+                                        onChange={(e) => setMoveModal({ ...moveModal, targetBucket: e.target.value })}
+                                    >
+                                        {moveModal.bucketList.map(b => (
+                                            <option key={b.name} value={b.name}>{b.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-medium text-muted-foreground block mb-2">Destination Folder Path</label>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            className="w-full bg-secondary border border-input rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:border-foreground font-mono"
+                                            placeholder="folder/subfolder/"
+                                            value={moveModal.targetPrefix}
+                                            onChange={(e) => setMoveModal({ ...moveModal, targetPrefix: e.target.value })}
+                                        />
+                                        <Folder size={16} className="absolute left-3.5 top-3.5 text-muted-foreground" />
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-1.5 ml-1">Leave empty to move to root. Use trailing slash for folders.</p>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-3">
+                                <button onClick={handleMoveSelected} className="w-full bg-blue-600 text-white py-3.5 rounded-xl text-base font-medium hover:bg-blue-500 transition-colors shadow-sm active:scale-[0.98] transition-transform">Move Items</button>
+                                <button onClick={() => setMoveModal({ ...moveModal, show: false })} className="w-full bg-secondary text-foreground py-3.5 rounded-xl text-base font-medium hover:bg-secondary/80 transition-colors active:scale-[0.98] transition-transform">Cancel</button>
                             </div>
                         </div>
+                    </BottomSheet>
+                ) : (
+                    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setMoveModal({ ...moveModal, show: false })}>
+                        <div className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                                    <FolderInput className="text-blue-500 w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold">Move Items</h3>
+                                    <p className="text-xs text-muted-foreground">Moving {selectedKeys.size} items</p>
+                                </div>
+                            </div>
 
-                        <div className="flex justify-end gap-3">
-                            <button onClick={() => setMoveModal({ ...moveModal, show: false })} className="px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary transition-colors">Cancel</button>
-                            <button onClick={handleMoveSelected} className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors shadow-sm">Move Items</button>
+                            <div className="space-y-4 mb-6">
+                                <div>
+                                    <label className="text-xs font-medium text-muted-foreground block mb-1.5">Destination Bucket</label>
+                                    <select
+                                        className="w-full bg-secondary border border-input rounded-md px-3 py-2 text-sm outline-none focus:border-foreground"
+                                        value={moveModal.targetBucket}
+                                        onChange={(e) => setMoveModal({ ...moveModal, targetBucket: e.target.value })}
+                                    >
+                                        {moveModal.bucketList.map(b => (
+                                            <option key={b.name} value={b.name}>{b.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-medium text-muted-foreground block mb-1.5">Destination Folder Path</label>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            className="w-full bg-secondary border border-input rounded-md pl-8 pr-3 py-2 text-sm outline-none focus:border-foreground font-mono"
+                                            placeholder="folder/subfolder/"
+                                            value={moveModal.targetPrefix}
+                                            onChange={(e) => setMoveModal({ ...moveModal, targetPrefix: e.target.value })}
+                                        />
+                                        <Folder size={14} className="absolute left-2.5 top-2.5 text-muted-foreground" />
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-1">Leave empty to move to root. Use trailing slash for folders.</p>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3">
+                                <button onClick={() => setMoveModal({ ...moveModal, show: false })} className="px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary transition-colors">Cancel</button>
+                                <button onClick={handleMoveSelected} className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors shadow-sm">Move Items</button>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )
             )}
 
             {/* Create File Modal */}
@@ -932,41 +1137,65 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
 
             {/* Delete Confirmation Modal */}
             {deleteConfirmation.show && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setDeleteConfirmation({ show: false })}>
-                    <div className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
-                                <AlertTriangle className="text-destructive w-5 h-5" />
+                isMobile ? (
+                    <BottomSheet
+                        isOpen={deleteConfirmation.show}
+                        onClose={() => setDeleteConfirmation({ show: false })}
+                        title={`Delete ${selectedKeys.size > 1 ? `${selectedKeys.size} Items` : 'Item'}`}
+                        height="auto"
+                    >
+                        <div className="space-y-6 pb-4">
+                            <div className="flex flex-col items-center justify-center py-4 text-destructive gap-2">
+                                <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                                    <AlertTriangle className="w-8 h-8" />
+                                </div>
                             </div>
-                            <h3 className="text-lg font-semibold">Delete {selectedKeys.size > 1 ? `${selectedKeys.size} Items` : 'Item'}</h3>
+                            <p className="text-center text-muted-foreground">
+                                Are you sure you want to delete the selected items? This action cannot be undone.
+                            </p>
+                            <div className="flex flex-col gap-3">
+                                <button onClick={handleBulkDelete} className="w-full bg-destructive text-destructive-foreground py-3.5 rounded-xl text-base font-medium hover:opacity-90 transition-opacity shadow-sm active:scale-[0.98] transition-transform">Delete</button>
+                                <button onClick={() => setDeleteConfirmation({ show: false })} className="w-full bg-secondary text-foreground py-3.5 rounded-xl text-base font-medium hover:bg-secondary/80 transition-colors active:scale-[0.98] transition-transform">Cancel</button>
+                            </div>
                         </div>
-                        <p className="text-muted-foreground text-sm mb-6">
-                            Are you sure you want to delete the selected items? This action cannot be undone.
-                        </p>
-                        <div className="flex justify-end gap-3">
-                            <button onClick={() => setDeleteConfirmation({ show: false })} className="px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary transition-colors">Cancel</button>
-                            <button onClick={handleBulkDelete} className="px-4 py-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:opacity-90 transition-opacity shadow-sm">Delete</button>
+                    </BottomSheet>
+                ) : (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setDeleteConfirmation({ show: false })}>
+                        <div className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                                    <AlertTriangle className="text-destructive w-5 h-5" />
+                                </div>
+                                <h3 className="text-lg font-semibold">Delete {selectedKeys.size > 1 ? `${selectedKeys.size} Items` : 'Item'}</h3>
+                            </div>
+                            <p className="text-muted-foreground text-sm mb-6">
+                                Are you sure you want to delete the selected items? This action cannot be undone.
+                            </p>
+                            <div className="flex justify-end gap-3">
+                                <button onClick={() => setDeleteConfirmation({ show: false })} className="px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary transition-colors">Cancel</button>
+                                <button onClick={handleBulkDelete} className="px-4 py-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:opacity-90 transition-opacity shadow-sm">Delete</button>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )
             )}
 
             {/* Share Modal */}
             {shareModal.show && shareModal.file && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShareModal({ show: false, file: null, url: null, duration: 3600 })}>
-                    <div className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold">Share File</h3>
-                            <button onClick={() => setShareModal({ show: false, file: null, url: null, duration: 3600 })}><X size={18} className="text-muted-foreground hover:text-foreground" /></button>
-                        </div>
-
+                isMobile ? (
+                    <BottomSheet
+                        isOpen={shareModal.show}
+                        onClose={() => setShareModal({ show: false, file: null, url: null, duration: 3600 })}
+                        title="Share File"
+                        height="auto"
+                    >
                         {!shareModal.url ? (
-                            <div className="space-y-4">
+                            <div className="space-y-6 pb-4">
                                 <p className="text-sm text-muted-foreground">Generate a temporary public link for <span className="font-medium text-foreground">{shareModal.file.name}</span>.</p>
                                 <div>
-                                    <label className="text-xs font-medium text-muted-foreground">Expiration</label>
+                                    <label className="text-xs font-medium text-muted-foreground block mb-2">Expiration</label>
                                     <select
-                                        className="w-full mt-1 bg-secondary border border-border rounded-md px-3 py-2 text-sm outline-none"
+                                        className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm outline-none appearance-none"
                                         value={shareModal.duration}
                                         onChange={(e) => setShareModal(prev => ({ ...prev, duration: Number(e.target.value) }))}
                                     >
@@ -975,12 +1204,17 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                                         <option value={604800}>7 Days</option>
                                     </select>
                                 </div>
-                                <button onClick={generateShareLink} className="w-full bg-primary text-primary-foreground py-2 rounded-md text-sm font-medium hover:opacity-90 transition-opacity">Generate Link</button>
+                                <button onClick={generateShareLink} className="w-full bg-primary text-primary-foreground py-3.5 rounded-xl text-base font-medium hover:opacity-90 transition-opacity shadow-sm active:scale-[0.98] transition-transform">Generate Link</button>
                             </div>
                         ) : (
-                            <div className="space-y-4">
-                                <p className="text-sm text-green-500 flex items-center gap-2"><Check size={14} /> Link Generated!</p>
-                                <div className="bg-secondary p-3 rounded-md break-all text-xs font-mono text-muted-foreground border border-border">
+                            <div className="space-y-6 pb-4">
+                                <div className="flex flex-col items-center justify-center py-4 text-green-500 gap-2">
+                                    <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
+                                        <Check size={24} />
+                                    </div>
+                                    <p className="font-medium">Link Generated!</p>
+                                </div>
+                                <div className="bg-secondary p-4 rounded-xl break-all text-xs font-mono text-muted-foreground border border-border">
                                     {shareModal.url}
                                 </div>
                                 <button
@@ -988,14 +1222,58 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                                         navigator.clipboard.writeText(shareModal.url!);
                                         setNotification("Link copied to clipboard");
                                     }}
-                                    className="w-full bg-secondary hover:bg-secondary/80 text-foreground py-2 rounded-md text-sm font-medium transition-colors border border-border flex items-center justify-center gap-2"
+                                    className="w-full bg-foreground text-background py-3.5 rounded-xl text-base font-medium transition-colors flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] transition-transform"
                                 >
-                                    <Copy size={14} /> Copy to Clipboard
+                                    <Copy size={18} /> Copy to Clipboard
                                 </button>
                             </div>
                         )}
+                    </BottomSheet>
+                ) : (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShareModal({ show: false, file: null, url: null, duration: 3600 })}>
+                        <div className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-semibold">Share File</h3>
+                                <button onClick={() => setShareModal({ show: false, file: null, url: null, duration: 3600 })}><X size={18} className="text-muted-foreground hover:text-foreground" /></button>
+                            </div>
+
+                            {!shareModal.url ? (
+                                <div className="space-y-4">
+                                    <p className="text-sm text-muted-foreground">Generate a temporary public link for <span className="font-medium text-foreground">{shareModal.file.name}</span>.</p>
+                                    <div>
+                                        <label className="text-xs font-medium text-muted-foreground">Expiration</label>
+                                        <select
+                                            className="w-full mt-1 bg-secondary border border-border rounded-md px-3 py-2 text-sm outline-none"
+                                            value={shareModal.duration}
+                                            onChange={(e) => setShareModal(prev => ({ ...prev, duration: Number(e.target.value) }))}
+                                        >
+                                            <option value={3600}>1 Hour</option>
+                                            <option value={86400}>1 Day</option>
+                                            <option value={604800}>7 Days</option>
+                                        </select>
+                                    </div>
+                                    <button onClick={generateShareLink} className="w-full bg-primary text-primary-foreground py-2 rounded-md text-sm font-medium hover:opacity-90 transition-opacity">Generate Link</button>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <p className="text-sm text-green-500 flex items-center gap-2"><Check size={14} /> Link Generated!</p>
+                                    <div className="bg-secondary p-3 rounded-md break-all text-xs font-mono text-muted-foreground border border-border">
+                                        {shareModal.url}
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(shareModal.url!);
+                                            setNotification("Link copied to clipboard");
+                                        }}
+                                        className="w-full bg-secondary hover:bg-secondary/80 text-foreground py-2 rounded-md text-sm font-medium transition-colors border border-border flex items-center justify-center gap-2"
+                                    >
+                                        <Copy size={14} /> Copy to Clipboard
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )
             )}
 
             {/* Preview Modal (Lightbox) */}
@@ -1054,7 +1332,11 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
             )}
 
             {/* Toolbar */}
-            <div className="h-14 md:h-16 border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0 gap-2 bg-background/80 backdrop-blur sticky top-0 z-10" onClick={e => e.stopPropagation()}>
+            <div
+                className="h-14 md:h-16 border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0 gap-2 bg-background/80 backdrop-blur sticky top-0 z-10"
+                style={{ paddingTop: `${safeArea.top}px`, paddingLeft: `${Math.max(16, safeArea.left)}px`, paddingRight: `${Math.max(16, safeArea.right)}px` }}
+                onClick={e => e.stopPropagation()}
+            >
                 <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
                     <button
                         onClick={handleUp}
@@ -1067,11 +1349,11 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                     {/* Breadcrumbs */}
                     <div className="flex items-center text-sm overflow-x-auto whitespace-nowrap mask-linear-fade no-scrollbar">
                         <span
-                            className={`cursor-pointer transition-colors font-mono flex items-center gap-1 ${!currentPrefix ? 'text-foreground font-semibold' : 'text-muted-foreground hover:text-foreground'}`}
+                            className={`cursor-pointer transition-colors font-mono flex items-center gap-2 ${!currentPrefix ? 'text-foreground font-semibold' : 'text-muted-foreground hover:text-foreground'}`}
                             onClick={() => setCurrentPrefix('')}
                         >
-                            <Database size={14} className="opacity-50" />
-                            {bucketName}
+                            <Database size={14} className="opacity-50 shrink-0" />
+                            <span className="leading-none">{bucketName}</span>
                         </span>
                         <span className="mx-1.5 text-muted-foreground/50"><ChevronRight size={14} /></span>
                         {currentPrefix.split('/').filter(Boolean).map((part, idx, arr) => (
@@ -1091,24 +1373,25 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                     </div>
                 </div>
 
-                {/* Bucket Storage Info */}
-                {bucketStorage !== null && !storageLoading && (
-                    <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-secondary/50 border border-border rounded-md text-xs text-muted-foreground">
-                        <HardDrive size={12} className="text-foreground/70" />
-                        <span className="font-medium text-foreground">{formatBytes(bucketStorage)}</span>
-                    </div>
-                )}
-
                 <div className="flex items-center gap-2 md:gap-3 ml-auto">
                     <div className="relative hidden md:block">
                         <Search className="absolute left-2.5 top-2.5 text-muted-foreground w-4 h-4" />
                         <input
                             type="text"
                             placeholder="Filter..."
-                            className="bg-secondary border border-transparent hover:border-border focus:border-foreground rounded-md pl-9 pr-4 py-1.5 text-sm outline-none w-40 lg:w-56 transition-all"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            className="bg-secondary border border-transparent hover:border-border focus:border-foreground rounded-md pl-9 pr-8 py-1.5 text-sm outline-none w-40 lg:w-56 transition-all"
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
                         />
+                        {searchInput && (
+                            <button
+                                onClick={() => setSearchInput('')}
+                                className="absolute right-2 top-2 p-0.5 hover:bg-secondary-foreground/10 rounded-full text-muted-foreground"
+                                title="Clear search"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
                     </div>
 
                     <button
@@ -1242,74 +1525,134 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                             )}
 
                             {viewMode === ViewMode.LIST ? (
-                                <div className="rounded-lg border border-border overflow-hidden bg-card/50">
-                                    {filteredFiles.length > 0 && (
-                                        <table className="w-full text-left text-sm">
-                                            <thead className="bg-secondary border-b border-border text-muted-foreground font-medium">
-                                                <tr>
-                                                    {selectionMode && (
-                                                        <th className="px-4 py-3 font-medium w-12">
-                                                            <div className="w-4 h-4 rounded border border-muted-foreground/50 flex items-center justify-center"><div className="w-2 h-2 bg-transparent"></div></div>
-                                                        </th>
-                                                    )}
-                                                    <th className="px-4 py-3 font-medium">Name</th>
-                                                    <th className="px-4 py-3 font-medium hidden sm:table-cell">Size</th>
-                                                    <th className="px-4 py-3 font-medium hidden md:table-cell">Modified</th>
-                                                    <th className="px-4 py-3 w-[120px]"></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-border">
-                                                {filteredFiles.map((file, index) => {
-                                                    const isSelected = selectedKeys.has(file.key);
-                                                    return (
-                                                        <tr
-                                                            key={file.key}
-                                                            className={`
-                                              group transition-colors cursor-pointer select-none
-                                              ${isSelected ? 'bg-blue-500/10 border-blue-500/20' : 'hover:bg-secondary/50'}
-                                          `}
-                                                            onClick={(e) => handleItemClick(file, e)}
-                                                            onTouchStart={(e) => handleLongPressStart(file, e)}
-                                                            onTouchEnd={(e) => {
-                                                                handleLongPressEnd();
-                                                                e.preventDefault();
-                                                                handleItemClick(file, e as any);
-                                                            }}
-                                                            onTouchMove={handleLongPressEnd}
-                                                            onMouseDown={(e) => handleLongPressStart(file, e)}
-                                                            onMouseUp={handleLongPressEnd}
-                                                            onMouseLeave={handleLongPressEnd}
-                                                        >
-                                                            {selectionMode && (
+                                isMobile ? (
+                                    <div className="flex flex-col divide-y divide-border pb-20">
+                                        {filteredFiles.map((file) => {
+                                            const isSelected = selectedKeys.has(file.key);
+                                            return (
+                                                <SwipeableListItem
+                                                    key={file.key}
+                                                    actions={[
+                                                        { id: 'share', icon: Share2, label: 'Share', color: 'blue' },
+                                                        { id: 'move', icon: FolderInput, label: 'Move', color: 'yellow' },
+                                                        { id: 'delete', icon: Trash2, label: 'Delete', color: 'red' }
+                                                    ]}
+                                                    onSwipeLeft={(actionId) => {
+                                                        if (actionId === 'share') openShareModal(file);
+                                                        if (actionId === 'move') {
+                                                            setSelectedKeys(new Set([file.key]));
+                                                            openMoveModal();
+                                                        }
+                                                        if (actionId === 'delete') {
+                                                            setSelectedKeys(new Set([file.key]));
+                                                            setDeleteConfirmation({ show: true });
+                                                        }
+                                                    }}
+                                                    onSwipeRight={() => {
+                                                        const newSelected = new Set(selectedKeys);
+                                                        if (newSelected.has(file.key)) {
+                                                            newSelected.delete(file.key);
+                                                        } else {
+                                                            newSelected.add(file.key);
+                                                        }
+                                                        setSelectedKeys(newSelected);
+                                                    }}
+                                                >
+                                                    <div
+                                                        className={`p-4 flex items-center gap-4 bg-background active:bg-secondary/50 transition-colors ${isSelected ? 'bg-blue-500/10' : ''}`}
+                                                        onClick={(e) => handleItemClick(file, e)}
+                                                    >
+                                                        <div className="shrink-0 text-muted-foreground">
+                                                            {getIcon(file, 24)}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className={`font-medium truncate text-sm ${isSelected ? 'text-blue-500' : 'text-foreground'}`}>{file.name}</p>
+                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                                                <span>{file.lastModified.toLocaleDateString()}</span>
+                                                                {!file.isFolder && (
+                                                                    <>
+                                                                        <span>•</span>
+                                                                        <span>{formatBytes(file.size)}</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {isSelected && <CheckCircle2 size={20} className="text-blue-500 shrink-0" />}
+                                                    </div>
+                                                </SwipeableListItem>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="rounded-lg border border-border overflow-hidden bg-card/50">
+                                        {filteredFiles.length > 0 && (
+                                            <table className="w-full text-left text-sm">
+                                                <thead className="bg-secondary border-b border-border text-muted-foreground font-medium">
+                                                    <tr>
+                                                        {selectionMode && (
+                                                            <th className="px-4 py-3 font-medium w-12">
+                                                                <div className="w-4 h-4 rounded border border-muted-foreground/50 flex items-center justify-center"><div className="w-2 h-2 bg-transparent"></div></div>
+                                                            </th>
+                                                        )}
+                                                        <th className="px-4 py-3 font-medium">Name</th>
+                                                        <th className="px-4 py-3 font-medium hidden sm:table-cell">Size</th>
+                                                        <th className="px-4 py-3 font-medium hidden md:table-cell">Modified</th>
+                                                        <th className="px-4 py-3 w-[120px]"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-border">
+                                                    {filteredFiles.map((file, index) => {
+                                                        const isSelected = selectedKeys.has(file.key);
+                                                        return (
+                                                            <tr
+                                                                key={file.key}
+                                                                className={`
+                                                  group transition-colors cursor-pointer select-none
+                                                  ${isSelected ? 'bg-blue-500/10 border-blue-500/20' : 'hover:bg-secondary/50'}
+                                              `}
+                                                                onClick={(e) => handleItemClick(file, e)}
+                                                                onTouchStart={(e) => handleLongPressStart(file, e)}
+                                                                onTouchEnd={(e) => {
+                                                                    handleLongPressEnd();
+                                                                    e.preventDefault();
+                                                                    handleItemClick(file, e as any);
+                                                                }}
+                                                                onTouchMove={handleLongPressEnd}
+                                                                onMouseDown={(e) => handleLongPressStart(file, e)}
+                                                                onMouseUp={handleLongPressEnd}
+                                                                onMouseLeave={handleLongPressEnd}
+                                                            >
+                                                                {selectionMode && (
+                                                                    <td className="px-2 sm:px-4 py-3">
+                                                                        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-muted-foreground/30 bg-background'}`}>
+                                                                            {isSelected && <Check size={10} className="text-white" />}
+                                                                        </div>
+                                                                    </td>
+                                                                )}
                                                                 <td className="px-2 sm:px-4 py-3">
-                                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-muted-foreground/30 bg-background'}`}>
-                                                                        {isSelected && <Check size={10} className="text-white" />}
+                                                                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                                                        <div className="shrink-0">{getIcon(file, 18)}</div>
+                                                                        <span className={`font-medium truncate min-w-0 flex-1 block text-sm ${isSelected ? 'text-blue-500 dark:text-blue-400' : 'text-foreground'}`}>{file.name}</span>
                                                                     </div>
                                                                 </td>
-                                                            )}
-                                                            <td className="px-2 sm:px-4 py-3">
-                                                                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                                                                    <div className="shrink-0">{getIcon(file, 18)}</div>
-                                                                    <span className={`font-medium truncate min-w-0 flex-1 block text-sm ${isSelected ? 'text-blue-500 dark:text-blue-400' : 'text-foreground'}`}>{file.name}</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-2 sm:px-4 py-3 text-muted-foreground font-mono text-xs hidden sm:table-cell whitespace-nowrap">{!file.isFolder && formatBytes(file.size)}</td>
-                                                            <td className="px-2 sm:px-4 py-3 text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">{file.lastModified.toLocaleDateString()}</td>
-                                                            <td className="px-2 sm:px-4 py-3">
-                                                                {!selectionMode && (
-                                                                    <div className="flex items-center justify-end gap-0.5 sm:gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                                                                        <button onClick={(e) => { e.stopPropagation(); handleDownload(file) }} className="p-1 sm:p-1.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground" title="Download"><Download size={14} className="sm:w-4 sm:h-4" /></button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); openShareModal(file) }} className="p-1 sm:p-1.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground hidden sm:inline-flex" title="Share"><Share2 size={14} className="sm:w-4 sm:h-4" /></button>
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    )
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    )}
-                                </div>
+                                                                <td className="px-2 sm:px-4 py-3 text-muted-foreground font-mono text-xs hidden sm:table-cell whitespace-nowrap">{!file.isFolder && formatBytes(file.size)}</td>
+                                                                <td className="px-2 sm:px-4 py-3 text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">{file.lastModified.toLocaleDateString()}</td>
+                                                                <td className="px-2 sm:px-4 py-3">
+                                                                    {!selectionMode && (
+                                                                        <div className="flex items-center justify-end gap-0.5 sm:gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                                                            <button onClick={(e) => { e.stopPropagation(); handleDownload(file) }} className="p-1 sm:p-1.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground" title="Download"><Download size={14} className="sm:w-4 sm:h-4" /></button>
+                                                                            <button onClick={(e) => { e.stopPropagation(); openShareModal(file) }} className="p-1 sm:p-1.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground hidden sm:inline-flex" title="Share"><Share2 size={14} className="sm:w-4 sm:h-4" /></button>
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        )
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        )}
+                                    </div>
+                                )
                             ) : (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                                     {filteredFiles.map((file, index) => {
