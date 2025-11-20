@@ -370,9 +370,9 @@ const BucketList: React.FC<BucketListProps> = ({ s3, selectedBucket, onSelectBuc
                 )}
             </div>
 
-            {/* Storage Summary */}
+            {/* Storage Summary - Sticky on mobile */}
             {!error && buckets.length > 0 && (
-                <div className="p-4 border-t border-border bg-background/50 backdrop-blur-sm">
+                <div className="p-4 border-t border-border bg-background/95 backdrop-blur-sm md:bg-background/50 sticky bottom-0 md:relative">
                     <div className="bg-card dark:bg-[#16181D] rounded-lg p-3 border border-border shadow-inner group/storage hover:border-foreground/20 transition-colors">
                         <div className="flex justify-between items-center text-[10px] text-muted-foreground mb-2">
                             <div className="flex items-center gap-1.5">

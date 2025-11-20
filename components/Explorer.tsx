@@ -73,15 +73,8 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
     const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.LIST);
     const [search, setSearch] = useState('');
     const [refreshTrigger, setRefreshTrigger] = useState(0);
-    const [processingState, setProcessingState] = useState<string | null>(null);
-    const [notification, setNotification] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Interaction Mode
-    const [selectionMode, setSelectionMode] = useState(false);
-    const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-
-    // Preview & Editing State
+    // Preview
     const [previewFile, setPreviewFile] = useState<{ file: FileObject, url: string, content?: string } | null>(null);
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -89,18 +82,39 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
     const [editorScrollTop, setEditorScrollTop] = useState(0);
     const [mdTab, setMdTab] = useState<'write' | 'preview'>('write');
 
+    // Selection
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+
+    // Long-press context menu
+    const [contextMenu, setContextMenu] = useState<{ show: boolean, file: FileObject | null, x: number, y: number }>({
+        show: false, file: null, x: 0, y: 0
+    });
+    const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+
     // Modals
+    const [shareModal, setShareModal] = useState<{ show: boolean, file: FileObject | null, url: string | null, duration: number }>({
+        show: false, file: null, url: null, duration: 3600
+    });
     const [deleteConfirmation, setDeleteConfirmation] = useState<{ show: boolean, isBulk?: boolean }>({ show: false });
-    const [shareModal, setShareModal] = useState<{ show: boolean, file: FileObject | null, url: string | null, duration: number }>({ show: false, file: null, url: null, duration: 3600 });
-    const [createFileModal, setCreateFileModal] = useState({ show: false, filename: '', content: '' });
-    const [moveModal, setMoveModal] = useState<{ show: boolean, targetBucket: string, targetPrefix: string, bucketList: BucketObject[] }>({ show: false, targetBucket: '', targetPrefix: '', bucketList: [] });
+    const [createFileModal, setCreateFileModal] = useState<{ show: boolean, filename: string, content: string }>({
+        show: false, filename: '', content: ''
+    });
+    const [moveModal, setMoveModal] = useState<{ show: boolean, targetBucket: string, targetPrefix: string, bucketList: BucketObject[] }>({
+        show: false, targetBucket: bucketName, targetPrefix: currentPrefix, bucketList: []
+    });
     const [actionError, setActionError] = useState<{ show: boolean, title: string, message: string, details?: string, docLink?: string } | null>(null);
 
-    // Storage tracking for current bucket
+    // UI State
+    const [processingState, setProcessingState] = useState<string | null>(null);
+    const [notification, setNotification] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Storage tracking
     const [bucketStorage, setBucketStorage] = useState<number | null>(null);
     const [storageLoading, setStorageLoading] = useState(false);
 
-    // Pull-to-refresh state (mobile only)
+    // Pull to refresh
     const [isPulling, setIsPulling] = useState(false);
     const [pullDistance, setPullDistance] = useState(0);
     const pullStartY = useRef(0);
@@ -269,6 +283,25 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         setSelectionMode(newMode);
         if (!newMode) {
             setSelectedKeys(new Set());
+        }
+    };
+
+    // Long-press handlers
+    const handleLongPressStart = (file: FileObject, e: React.TouchEvent | React.MouseEvent) => {
+        const touch = 'touches' in e ? e.touches[0] : e;
+        longPressTimer.current = setTimeout(() => {
+            setContextMenu({ show: true, file, x: touch.clientX, y: touch.clientY });
+            // Haptic feedback if available
+            if ('vibrate' in navigator) {
+                navigator.vibrate(50);
+            }
+        }, 500); // 500ms long press
+    };
+
+    const handleLongPressEnd = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
         }
     };
 
@@ -1138,7 +1171,7 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
             {/* File Area */}
             <div
                 ref={listRef}
-                className="flex-1 overflow-y-auto bg-background overscroll-none pb-20 relative z-10 transition-transform duration-200 ease-out"
+                className="flex-1 overflow-y-auto bg-background overscroll-none pb-4 md:pb-20 relative z-10 transition-transform duration-200 ease-out"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
@@ -1192,7 +1225,7 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                     </div>
                 ) : (
                     !loading && (
-                        <div className="p-4 md:p-6 min-h-full">
+                        <div className="p-2 md:p-6 min-h-full">
                             {filteredFiles.length === 0 && search && (
                                 <div className="text-center text-muted-foreground py-12">
                                     <Search size={48} className="mx-auto mb-4 opacity-30" />
@@ -1236,28 +1269,37 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                                               ${isSelected ? 'bg-blue-500/10 border-blue-500/20' : 'hover:bg-secondary/50'}
                                           `}
                                                             onClick={(e) => handleItemClick(file, e)}
+                                                            onTouchStart={(e) => handleLongPressStart(file, e)}
+                                                            onTouchEnd={(e) => {
+                                                                handleLongPressEnd();
+                                                                e.preventDefault();
+                                                                handleItemClick(file, e as any);
+                                                            }}
+                                                            onTouchMove={handleLongPressEnd}
+                                                            onMouseDown={(e) => handleLongPressStart(file, e)}
+                                                            onMouseUp={handleLongPressEnd}
+                                                            onMouseLeave={handleLongPressEnd}
                                                         >
                                                             {selectionMode && (
-                                                                <td className="px-4 py-3">
+                                                                <td className="px-2 sm:px-4 py-3">
                                                                     <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-muted-foreground/30 bg-background'}`}>
                                                                         {isSelected && <Check size={10} className="text-white" />}
                                                                     </div>
                                                                 </td>
                                                             )}
-                                                            <td className="px-4 py-3">
-                                                                <div className="flex items-center gap-3 min-w-0">
-                                                                    <div className="shrink-0">{getIcon(file)}</div>
-                                                                    <span className={`font-medium truncate min-w-0 flex-1 block ${isSelected ? 'text-blue-500 dark:text-blue-400' : 'text-foreground'}`}>{file.name}</span>
+                                                            <td className="px-2 sm:px-4 py-3">
+                                                                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                                                    <div className="shrink-0">{getIcon(file, 18)}</div>
+                                                                    <span className={`font-medium truncate min-w-0 flex-1 block text-sm ${isSelected ? 'text-blue-500 dark:text-blue-400' : 'text-foreground'}`}>{file.name}</span>
                                                                 </div>
                                                             </td>
-                                                            <td className="px-4 py-3 text-muted-foreground font-mono text-xs hidden sm:table-cell whitespace-nowrap">{!file.isFolder && formatBytes(file.size)}</td>
-                                                            <td className="px-4 py-3 text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">{file.lastModified.toLocaleDateString()}</td>
-                                                            <td className="px-4 py-3 text-right">
+                                                            <td className="px-2 sm:px-4 py-3 text-muted-foreground font-mono text-xs hidden sm:table-cell whitespace-nowrap">{!file.isFolder && formatBytes(file.size)}</td>
+                                                            <td className="px-2 sm:px-4 py-3 text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">{file.lastModified.toLocaleDateString()}</td>
+                                                            <td className="px-2 sm:px-4 py-3">
                                                                 {!selectionMode && (
-                                                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                        <button onClick={(e) => { e.stopPropagation(); handleCopyS3Path(file) }} className="p-1.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground" title="Copy S3 URI"><Link size={16} /></button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); openShareModal(file) }} className="p-1.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground" title="Share"><Share2 size={16} /></button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); handleDownload(file) }} className="p-1.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground" title="Download"><Download size={16} /></button>
+                                                                    <div className="flex items-center justify-end gap-0.5 sm:gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                                                        <button onClick={(e) => { e.stopPropagation(); handleDownload(file) }} className="p-1 sm:p-1.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground" title="Download"><Download size={14} className="sm:w-4 sm:h-4" /></button>
+                                                                        <button onClick={(e) => { e.stopPropagation(); openShareModal(file) }} className="p-1 sm:p-1.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground hidden sm:inline-flex" title="Share"><Share2 size={14} className="sm:w-4 sm:h-4" /></button>
                                                                     </div>
                                                                 )}
                                                             </td>
@@ -1277,8 +1319,18 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                                             <div
                                                 key={file.key}
                                                 onClick={(e) => handleItemClick(file, e)}
+                                                onTouchStart={(e) => handleLongPressStart(file, e)}
+                                                onTouchEnd={(e) => {
+                                                    handleLongPressEnd();
+                                                    e.preventDefault();
+                                                    handleItemClick(file, e as any);
+                                                }}
+                                                onTouchMove={handleLongPressEnd}
+                                                onMouseDown={(e) => handleLongPressStart(file, e)}
+                                                onMouseUp={handleLongPressEnd}
+                                                onMouseLeave={handleLongPressEnd}
                                                 className={`
-                                 group relative border rounded-lg p-4 flex flex-col items-center text-center transition-all cursor-pointer aspect-[1/1.1]
+                                 group relative border rounded-lg p-3 sm:p-4 flex flex-col items-center text-center transition-all cursor-pointer aspect-[1/1.1]
                                  ${isSelected ? 'bg-blue-500/10 border-blue-500/50 shadow-md' : 'bg-card border-border hover:border-foreground/50 hover:shadow-lg'}
                              `}
                                             >
@@ -1303,17 +1355,109 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
             </div>
 
             {/* Floating Action Bar for Selection */}
+            {/* Floating Action Bar for Selection - Dynamic positioning */}
             {selectedKeys.size > 0 && (
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-foreground text-background px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 animate-in slide-in-from-bottom-4 z-50">
-                    <span className="font-bold text-sm">{selectedKeys.size} selected</span>
+                <div className="fixed left-1/2 -translate-x-1/2 bg-foreground text-background px-4 sm:px-6 py-2 sm:py-3 rounded-full shadow-2xl flex items-center gap-3 sm:gap-6 animate-in slide-in-from-bottom-4 z-50" style={{ bottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
+                    <span className="font-bold text-xs sm:text-sm">{selectedKeys.size} selected</span>
                     <div className="h-4 w-px bg-background/20"></div>
-                    <div className="flex items-center gap-2">
-                        <button onClick={handleBulkDownload} className="p-2 hover:bg-background/20 rounded-full transition-colors" title="Download Selected"><Download size={20} /></button>
-                        {!readOnly && <button onClick={openMoveModal} className="p-2 hover:bg-background/20 rounded-full transition-colors" title="Move Selected"><Move size={20} /></button>}
-                        {!readOnly && <button onClick={() => setDeleteConfirmation({ show: true, isBulk: true })} className="p-2 hover:bg-red-500/20 hover:text-red-300 rounded-full transition-colors" title="Delete Selected"><Trash2 size={20} /></button>}
-                        <button onClick={() => setSelectedKeys(new Set())} className="p-2 hover:bg-background/20 rounded-full transition-colors ml-2"><X size={20} /></button>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                        <button onClick={handleBulkDownload} className="p-1.5 sm:p-2 hover:bg-background/20 rounded-full transition-colors" title="Download Selected"><Download size={18} className="sm:w-5 sm:h-5" /></button>
+                        {!readOnly && <button onClick={openMoveModal} className="p-1.5 sm:p-2 hover:bg-background/20 rounded-full transition-colors hidden sm:inline-flex" title="Move Selected"><Move size={18} className="sm:w-5 sm:h-5" /></button>}
+                        {!readOnly && <button onClick={() => setDeleteConfirmation({ show: true, isBulk: true })} className="p-1.5 sm:p-2 hover:bg-red-500/20 hover:text-red-300 rounded-full transition-colors" title="Delete Selected"><Trash2 size={18} className="sm:w-5 sm:h-5" /></button>}
+                        <button onClick={() => setSelectedKeys(new Set())} className="p-1.5 sm:p-2 hover:bg-background/20 rounded-full transition-colors ml-1 sm:ml-2"><X size={18} className="sm:w-5 sm:h-5" /></button>
                     </div>
                 </div>
+            )}
+
+            {/* Long-press Context Menu */}
+            {contextMenu.show && contextMenu.file && (
+                <>
+                    {/* Backdrop */}
+                    <div className="fixed inset-0 z-50" onClick={() => setContextMenu({ show: false, file: null, x: 0, y: 0 })} />
+
+                    {/* Context Menu */}
+                    <div
+                        className="fixed bg-card border border-border rounded-lg shadow-2xl py-2 z-50 min-w-[200px] animate-in fade-in zoom-in-95 duration-200"
+                        style={{
+                            left: `${Math.min(contextMenu.x, window.innerWidth - 220)}px`,
+                            top: `${Math.min(contextMenu.y, window.innerHeight - 300)}px`
+                        }}
+                    >
+                        <div className="px-3 py-2 border-b border-border">
+                            <div className="flex items-center gap-2">
+                                {getIcon(contextMenu.file, 16)}
+                                <span className="text-sm font-medium truncate max-w-[150px]">{contextMenu.file.name}</span>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                if (contextMenu.file!.isFolder) {
+                                    handleNavigate(contextMenu.file!.key);
+                                } else {
+                                    handlePreview(contextMenu.file!);
+                                }
+                                setContextMenu({ show: false, file: null, x: 0, y: 0 });
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-secondary flex items-center gap-2 transition-colors"
+                        >
+                            <Eye size={16} />
+                            {contextMenu.file.isFolder ? 'Open' : 'Preview'}
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                handleDownload(contextMenu.file!);
+                                setContextMenu({ show: false, file: null, x: 0, y: 0 });
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-secondary flex items-center gap-2 transition-colors"
+                        >
+                            <Download size={16} />
+                            Download
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                openShareModal(contextMenu.file!);
+                                setContextMenu({ show: false, file: null, x: 0, y: 0 });
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-secondary flex items-center gap-2 transition-colors"
+                        >
+                            <Share2 size={16} />
+                            Share
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                handleCopyS3Path(contextMenu.file!);
+                                setContextMenu({ show: false, file: null, x: 0, y: 0 });
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-secondary flex items-center gap-2 transition-colors"
+                        >
+                            <Link size={16} />
+                            Copy S3 URI
+                        </button>
+
+                        {!readOnly && (
+                            <>
+                                <div className="h-px bg-border my-1" />
+                                <button
+                                    onClick={() => {
+                                        const newSelected = new Set(selectedKeys);
+                                        newSelected.add(contextMenu.file!.key);
+                                        setSelectedKeys(newSelected);
+                                        setSelectionMode(true);
+                                        setContextMenu({ show: false, file: null, x: 0, y: 0 });
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-sm hover:bg-secondary flex items-center gap-2 transition-colors"
+                                >
+                                    <CheckSquare size={16} />
+                                    Select
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </>
             )}
 
 
