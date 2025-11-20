@@ -111,28 +111,87 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         onDragStart: (file) => {
             console.log('Drag started:', file.name);
         },
-        onDragEnd: async (file, targetFolder) => {
-            if (targetFolder && targetFolder.isFolder) {
-                // Move file to folder
-                setProcessingState(`Moving ${file.name}...`);
-                try {
-                    const newKey = `${targetFolder.key}${file.name}`;
-                    if (file.isFolder) {
-                        await s3.moveFolder(bucketName, file.key, bucketName, newKey);
-                    } else {
-                        await s3.moveObject(bucketName, file.key, bucketName, newKey);
-                    }
-                    setRefreshTrigger(p => p + 1);
-                    setNotification(`Moved ${file.name} to ${targetFolder.name}`);
-                } catch (e) {
-                    console.error('Move failed:', e);
-                    setNotification('Move failed');
-                } finally {
-                    setProcessingState(null);
+        onDragEnd: async (source, target) => {
+            if (!target || source.key === target.key) return;
+            setProcessingState(`Moving ${source.name}...`);
+            try {
+                const newKey = `${target.key}${source.name}`;
+                if (source.isFolder) {
+                    await s3.moveFolder(bucketName, source.key, bucketName, newKey);
+                } else {
+                    await s3.moveObject(bucketName, source.key, bucketName, newKey);
                 }
+                setRefreshTrigger(p => p + 1);
+                setNotification(`Moved ${source.name} to ${target.name}`);
+            } catch (e) {
+                console.error('Move failed:', e);
+                setNotification('Move failed');
+            } finally {
+                setProcessingState(null);
             }
         }
     });
+
+    // Desktop Drag and Drop Handlers
+    const handleDragStart = (e: React.DragEvent, file: FileObject) => {
+        if (isMobile) return;
+        e.dataTransfer.setData('application/json', JSON.stringify(file));
+        e.dataTransfer.effectAllowed = 'move';
+        // Set drag image if needed, or let browser handle it
+    };
+
+    const handleDragOver = (e: React.DragEvent, targetFolder: FileObject) => {
+        if (isMobile) return;
+        e.preventDefault(); // Necessary to allow dropping
+        if (!targetFolder.isFolder) return;
+        e.dataTransfer.dropEffect = 'move';
+        e.currentTarget.classList.add('bg-blue-500/20');
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        if (isMobile) return;
+        e.currentTarget.classList.remove('bg-blue-500/20');
+    };
+
+    const handleDrop = async (e: React.DragEvent, targetFolder: FileObject) => {
+        if (isMobile) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.currentTarget.classList.remove('bg-blue-500/20');
+
+        if (!targetFolder.isFolder) return;
+
+        try {
+            const data = e.dataTransfer.getData('application/json');
+            if (!data) return;
+
+            const sourceFile: FileObject = JSON.parse(data);
+
+            // Prevent moving into itself or same folder
+            if (sourceFile.key === targetFolder.key) return;
+
+            // Reuse the move logic
+            setProcessingState(`Moving ${sourceFile.name}...`);
+            try {
+                const newKey = `${targetFolder.key}${sourceFile.name}`;
+                if (sourceFile.isFolder) {
+                    await s3.moveFolder(bucketName, sourceFile.key, bucketName, newKey);
+                } else {
+                    await s3.moveObject(bucketName, sourceFile.key, bucketName, newKey);
+                }
+                setRefreshTrigger(p => p + 1);
+                setNotification(`Moved ${sourceFile.name} to ${targetFolder.name}`);
+            } catch (e) {
+                console.error('Move failed:', e);
+                setNotification('Move failed');
+            } finally {
+                setProcessingState(null);
+            }
+
+        } catch (err) {
+            console.error('Drop failed', err);
+        }
+    };
 
     // Preview
     const [previewFile, setPreviewFile] = useState<{ file: FileObject, url: string, content?: string } | null>(null);
@@ -1458,6 +1517,16 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
+                onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'copy';
+                }}
+                onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                        Array.from(e.dataTransfer.files).forEach(f => onUpload(f, currentPrefix, () => setRefreshTrigger(p => p + 1)));
+                    }
+                }}
                 style={{ transform: isPulling ? `translateY(${pullDistance}px)` : 'none' }}
             >
                 {/* Permission Denied / Error View */}
@@ -1561,6 +1630,13 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                                                     <div
                                                         className={`p-4 flex items-center gap-4 bg-background active:bg-secondary/50 transition-colors ${isSelected ? 'bg-blue-500/10' : ''}`}
                                                         onClick={(e) => handleItemClick(file, e)}
+                                                        {...(isMobile ? {
+                                                            onTouchStart: (e) => dragHandlers.onTouchStart(e, file),
+                                                            onTouchMove: dragHandlers.onTouchMove,
+                                                            onTouchEnd: dragHandlers.onTouchEnd,
+                                                            onMouseEnter: file.isFolder ? () => setDropTarget(file) : undefined,
+                                                            onMouseLeave: () => setDropTarget(null)
+                                                        } : {})}
                                                     >
                                                         <div className="shrink-0 text-muted-foreground">
                                                             {getIcon(file, 24)}
@@ -1621,6 +1697,11 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                                                                 onMouseDown={(e) => handleLongPressStart(file, e)}
                                                                 onMouseUp={handleLongPressEnd}
                                                                 onMouseLeave={handleLongPressEnd}
+                                                                draggable={!isMobile}
+                                                                onDragStart={(e) => handleDragStart(e, file)}
+                                                                onDragOver={(e) => handleDragOver(e, file)}
+                                                                onDragLeave={handleDragLeave}
+                                                                onDrop={(e) => handleDrop(e, file)}
                                                             >
                                                                 {selectionMode && (
                                                                     <td className="px-2 sm:px-4 py-3">
@@ -1672,6 +1753,11 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                                                 onMouseDown={(e) => handleLongPressStart(file, e)}
                                                 onMouseUp={handleLongPressEnd}
                                                 onMouseLeave={handleLongPressEnd}
+                                                draggable={!isMobile}
+                                                onDragStart={(e) => handleDragStart(e, file)}
+                                                onDragOver={(e) => handleDragOver(e, file)}
+                                                onDragLeave={handleDragLeave}
+                                                onDrop={(e) => handleDrop(e, file)}
                                                 className={`
                                  group relative border rounded-lg p-3 sm:p-4 flex flex-col items-center text-center transition-all cursor-pointer aspect-[1/1.1]
                                  ${isSelected ? 'bg-blue-500/10 border-blue-500/50 shadow-md' : 'bg-card border-border hover:border-foreground/50 hover:shadow-lg'}
