@@ -33,11 +33,12 @@
     content="The modern interface for your cloud storage. Secure, fast, and serverless management for your S3 buckets." />
 
   <!-- PWA & Icons -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="apple-touch-icon" href="https://cdn.lucide.dev/icon/database.svg">
-  <link rel="manifest"
-    href='data:application/manifest+json,{"name":"S4 Storage","short_name":"S4","start_url":"/","display":"standalone","background_color":"#16181D","theme_color":"#16181D","icons":[{"src":"https://cdn.lucide.dev/icon/database.svg","sizes":"192x192","type":"image/svg+xml"},{"src":"https://cdn.lucide.dev/icon/database.svg","sizes":"512x512","type":"image/svg+xml"}]}'>
+  <meta name="apple-mobile-web-app-title" content="S4" />
+  <link rel="manifest" href="/manifest.json" />
 
   <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
   <script>
@@ -222,6 +223,17 @@
 }
 </script>
   <link rel="stylesheet" href="/index.css">
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('Service Worker registered:', reg.scope))
+          .catch(err => console.log('Service Worker registration failed:', err));
+      });
+    }
+  </script>
 </head>
 
 <body class="bg-background text-foreground antialiased selection:bg-blue-500/30 transition-colors duration-300">

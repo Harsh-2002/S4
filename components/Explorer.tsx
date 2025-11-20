@@ -10,7 +10,7 @@ import {
     X, FileJson, FileSpreadsheet, Terminal, Binary, AlertTriangle, AlertCircle,
     Archive, Check, Share2, ChevronLeft, ChevronRight as ChevronRightIcon, Edit2, Save,
     PenTool, BookOpen, CheckSquare, MousePointer2, CheckCircle2, FilePlus, ShieldAlert, Lock,
-    Link, Move, FolderInput, Copy, TerminalSquare, HardDrive
+    Link, Move, FolderInput, Copy, TerminalSquare, HardDrive, UploadCloud
 } from 'lucide-react';
 import { parse } from 'marked';
 import DOMPurify from 'dompurify';
@@ -99,6 +99,40 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
     // Storage tracking for current bucket
     const [bucketStorage, setBucketStorage] = useState<number | null>(null);
     const [storageLoading, setStorageLoading] = useState(false);
+
+    // Pull-to-refresh state (mobile only)
+    const [isPulling, setIsPulling] = useState(false);
+    const [pullDistance, setPullDistance] = useState(0);
+    const pullStartY = useRef(0);
+    const listRef = useRef<HTMLDivElement>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (listRef.current && listRef.current.scrollTop === 0) {
+            pullStartY.current = e.touches[0].clientY;
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!listRef.current || listRef.current.scrollTop > 0 || pullStartY.current === 0) return;
+
+        const currentY = e.touches[0].clientY;
+        const diff = currentY - pullStartY.current;
+
+        if (diff > 0) {
+            setIsPulling(true);
+            // Add resistance
+            setPullDistance(Math.min(diff * 0.5, 80));
+        }
+    };
+
+    const handleTouchEnd = async () => {
+        if (isPulling && pullDistance > 50) {
+            await loadFiles();
+        }
+        setIsPulling(false);
+        setPullDistance(0);
+        pullStartY.current = 0;
+    };
 
     useEffect(() => {
         setCurrentPrefix('');
@@ -1096,8 +1130,20 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                 </div>
             </div>
 
+            {/* Pull Refresh Spinner */}
+            <div className="absolute top-14 md:top-16 left-0 right-0 flex justify-center z-0 pointer-events-none">
+                <Loader2 className={`w-6 h-6 text-blue-500 transition-all duration-200 ${isPulling ? 'opacity-100' : 'opacity-0'} ${pullDistance > 50 ? 'animate-spin' : ''}`} style={{ transform: `rotate(${pullDistance * 3}deg)` }} />
+            </div>
+
             {/* File Area */}
-            <div className="flex-1 overflow-y-auto bg-background overscroll-none pb-20">
+            <div
+                ref={listRef}
+                className="flex-1 overflow-y-auto bg-background overscroll-none pb-20 relative z-10 transition-transform duration-200 ease-out"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                style={{ transform: isPulling ? `translateY(${pullDistance}px)` : 'none' }}
+            >
                 {/* Permission Denied / Error View */}
                 {viewError ? (
                     <div className="flex flex-col items-center justify-center h-[60vh] p-8 text-center animate-in fade-in duration-500 select-text">
@@ -1168,9 +1214,11 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                                         <table className="w-full text-left text-sm">
                                             <thead className="bg-secondary border-b border-border text-muted-foreground font-medium">
                                                 <tr>
-                                                    <th className="px-4 py-3 font-medium w-12">
-                                                        {selectionMode && <div className="w-4 h-4 rounded border border-muted-foreground/50 flex items-center justify-center"><div className="w-2 h-2 bg-transparent"></div></div>}
-                                                    </th>
+                                                    {selectionMode && (
+                                                        <th className="px-4 py-3 font-medium w-12">
+                                                            <div className="w-4 h-4 rounded border border-muted-foreground/50 flex items-center justify-center"><div className="w-2 h-2 bg-transparent"></div></div>
+                                                        </th>
+                                                    )}
                                                     <th className="px-4 py-3 font-medium">Name</th>
                                                     <th className="px-4 py-3 font-medium hidden sm:table-cell">Size</th>
                                                     <th className="px-4 py-3 font-medium hidden md:table-cell">Modified</th>
@@ -1189,11 +1237,13 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                                           `}
                                                             onClick={(e) => handleItemClick(file, e)}
                                                         >
-                                                            <td className="px-4 py-3">
-                                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-muted-foreground/30 bg-background'}`}>
-                                                                    {isSelected && <Check size={10} className="text-white" />}
-                                                                </div>
-                                                            </td>
+                                                            {selectionMode && (
+                                                                <td className="px-4 py-3">
+                                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-muted-foreground/30 bg-background'}`}>
+                                                                        {isSelected && <Check size={10} className="text-white" />}
+                                                                    </div>
+                                                                </td>
+                                                            )}
                                                             <td className="px-4 py-3">
                                                                 <div className="flex items-center gap-3 min-w-0">
                                                                     <div className="shrink-0">{getIcon(file)}</div>
@@ -1265,6 +1315,9 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                     </div>
                 </div>
             )}
+
+
+
         </div>
     );
 };

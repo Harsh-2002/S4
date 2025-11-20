@@ -5,7 +5,8 @@ import {
     Database, CloudLightning, Search,
     Folder, Image as ImageIcon, FileCode, MoreHorizontal, ShieldCheck,
     Sparkles, LayoutGrid, ChevronRight, Command, User, Bell, Settings,
-    Star, Clock, HardDrive, MoreVertical, List, Filter, Code2
+    Star, Clock, HardDrive, MoreVertical, List, Filter, Code2,
+    Smartphone, WifiOff, Download, Heart
 } from 'lucide-react';
 
 interface LandingProps {
@@ -48,7 +49,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                         className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-background/50 hover:bg-secondary backdrop-blur-md text-[10px] uppercase tracking-widest font-semibold text-muted-foreground hover:text-foreground transition-all cursor-pointer group shadow-sm"
                     >
                         <Github size={12} className="group-hover:text-foreground transition-colors" />
-                        Open Source Project
+                        Open Source
                     </a>
 
                     <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tighter text-foreground leading-[1.1] drop-shadow-sm dark:drop-shadow-2xl">
@@ -120,7 +121,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                         </div>
 
                         {/* Mockup Body */}
-                        <div className="flex h-[400px] sm:h-[500px] md:h-[600px] bg-background dark:bg-[#0F1115] relative text-left">
+                        <div className="flex h-[350px] sm:h-[450px] md:h-[600px] bg-background dark:bg-[#0F1115] relative text-left">
 
                             {/* Sidebar (Hidden on Mobile) */}
                             <div className="w-60 border-r border-border bg-secondary/10 dark:bg-[#121418] flex flex-col hidden md:flex shrink-0">
@@ -219,7 +220,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
 
                                 {/* Grid */}
                                 <div className="p-4 md:p-6 overflow-hidden relative">
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                                         {/* Interactive Folder */}
                                         <div className="aspect-[4/3.2] bg-card dark:bg-[#16181D] border border-border dark:border-white/5 rounded-xl p-3 flex flex-col items-center justify-center gap-3 hover:border-blue-500/40 hover:bg-blue-500/5 hover:shadow-[0_4px_20px_-12px_rgba(59,130,246,0.5)] transition-all group/item cursor-pointer relative">
                                             <Folder size={48} className="text-blue-500 fill-blue-500/10 drop-shadow-lg transition-transform group-hover/item:scale-110 duration-300" />
@@ -270,8 +271,13 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                                         </div>
 
                                         {/* Placeholders */}
-                                        {[1, 2, 3].map((i) => (
-                                            <div key={i} className="aspect-[4/3.2] bg-secondary/20 dark:bg-[#16181D]/40 border border-border dark:border-white/5 rounded-xl p-3 flex flex-col items-center justify-center gap-2 opacity-40 hover:opacity-60 transition-all cursor-pointer hover:bg-secondary/40">
+                                        <div className="aspect-[4/3.2] bg-secondary/20 dark:bg-[#16181D]/40 border border-border dark:border-white/5 rounded-xl p-3 flex flex-col items-center justify-center gap-2 opacity-40 hover:opacity-60 transition-all cursor-pointer hover:bg-secondary/40 sm:hidden">
+                                            <div className="w-12 h-12 rounded-lg bg-muted/50 skeleton-shimmer"></div>
+                                            <div className="w-16 h-2 rounded bg-muted/50 mt-2"></div>
+                                            <div className="w-8 h-1.5 rounded bg-muted/50"></div>
+                                        </div>
+                                        {[1, 2].map((i) => (
+                                            <div key={i} className="aspect-[4/3.2] bg-secondary/20 dark:bg-[#16181D]/40 border border-border dark:border-white/5 rounded-xl p-3 flex-col items-center justify-center gap-2 opacity-40 hover:opacity-60 transition-all cursor-pointer hover:bg-secondary/40 hidden sm:flex">
                                                 <div className="w-12 h-12 rounded-lg bg-muted/50 skeleton-shimmer"></div>
                                                 <div className="w-16 h-2 rounded bg-muted/50 mt-2"></div>
                                                 <div className="w-8 h-1.5 rounded bg-muted/50"></div>
@@ -423,6 +429,49 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                     </div>
                 </div>
 
+                {/* PWA / Native Experience Section */}
+                <div className="w-full max-w-6xl mx-auto mb-20">
+                    <div className="text-center mb-12">
+                        <h2 className="text-3xl md:text-4xl font-bold mb-4">Native Experience</h2>
+                        <p className="text-muted-foreground max-w-2xl mx-auto">Install S4 on your device for the best experience</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+                        <div className="group p-6 rounded-2xl bg-card/50 border border-border hover:border-foreground/20 hover:bg-card transition-all duration-300 backdrop-blur-sm hover:-translate-y-1 cursor-default relative overflow-hidden shadow-sm">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-3xl -mr-4 -mt-4 transition-transform group-hover:scale-150 duration-700"></div>
+                            <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 border border-blue-500/20 relative z-10">
+                                <Smartphone size={24} className="text-blue-500" />
+                            </div>
+                            <h3 className="text-lg font-bold mb-2 text-foreground group-hover:text-primary transition-colors relative z-10">Installable PWA</h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors relative z-10">
+                                Add S4 to your home screen on iOS, Android, or Desktop. It runs in its own window, free from browser distractions.
+                            </p>
+                        </div>
+
+                        <div className="group p-6 rounded-2xl bg-card/50 border border-border hover:border-foreground/20 hover:bg-card transition-all duration-300 backdrop-blur-sm hover:-translate-y-1 cursor-default relative overflow-hidden shadow-sm">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-500/10 to-transparent rounded-bl-3xl -mr-4 -mt-4 transition-transform group-hover:scale-150 duration-700"></div>
+                            <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 border border-purple-500/20 relative z-10">
+                                <WifiOff size={24} className="text-purple-500" />
+                            </div>
+                            <h3 className="text-lg font-bold mb-2 text-foreground group-hover:text-primary transition-colors relative z-10">Offline Ready</h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors relative z-10">
+                                S4 loads instantly, even without an internet connection. The app shell is cached locally for lightning-fast performance.
+                            </p>
+                        </div>
+
+                        <div className="group p-6 rounded-2xl bg-card/50 border border-border hover:border-foreground/20 hover:bg-card transition-all duration-300 backdrop-blur-sm hover:-translate-y-1 cursor-default relative overflow-hidden shadow-sm">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-500/10 to-transparent rounded-bl-3xl -mr-4 -mt-4 transition-transform group-hover:scale-150 duration-700"></div>
+                            <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 border border-green-500/20 relative z-10">
+                                <Zap size={24} className="text-green-500" />
+                            </div>
+                            <h3 className="text-lg font-bold mb-2 text-foreground group-hover:text-primary transition-colors relative z-10">Native Performance</h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors relative z-10">
+                                Experience smooth animations, touch gestures, and a responsive interface that feels just like a native application.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 {/* FAQ Section */}
                 <div className="w-full max-w-6xl mx-auto mb-20">
                     <div className="text-center mb-12">
@@ -496,13 +545,10 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                     </div>
                 </div>
 
-                <div className="text-xs text-muted-foreground pb-8 border-t border-border pt-8 w-full max-w-4xl flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <p>Licensed under MIT. Built with React, Tailwind, and AWS SDK V3.</p>
-                    <div className="flex gap-6">
-                        <a href="https://github.com/Harsh-2002/S4" className="hover:text-foreground transition-colors">GitHub</a>
-                        <a href="https://github.com/Harsh-2002/S4/issues" className="hover:text-foreground transition-colors">Report Issue</a>
-                        <a href="https://github.com/Harsh-2002/S4" className="hover:text-foreground transition-colors">Contribute</a>
-                    </div>
+                <div className="text-xs text-muted-foreground pb-8 border-t border-border pt-8 w-full max-w-4xl flex flex-col sm:flex-row justify-center items-center gap-4">
+                    <p className="flex items-center gap-1">
+                        Built with <Heart size={12} className="text-red-500 fill-red-500" /> by <a href="https://firstfinger.io/author/anurag-vishwakarma/" target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors font-medium">Anurag Vishwakarma</a>
+                    </p>
                 </div>
 
             </main>

@@ -1,0 +1,18 @@
+{
+    log {
+        level warn
+    }
+}
+
+:8080 {
+    root * /usr/share/caddy
+    
+    # Serve files from disk or fall back to index.html for SPA routing
+    file_server
+    
+    # Enable gzip compression for better performance
+    encode gzip
+    
+    # SPA routing: try to serve the requested path, fall back to index.html
+    try_files {path} /index.html
+}

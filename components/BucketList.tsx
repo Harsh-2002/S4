@@ -27,6 +27,40 @@ const BucketList: React.FC<BucketListProps> = ({ s3, selectedBucket, onSelectBuc
     const [totalStorage, setTotalStorage] = useState<number | null>(null);
     const [storageLoading, setStorageLoading] = useState(false);
 
+    // Pull-to-refresh state
+    const [isPulling, setIsPulling] = useState(false);
+    const [pullDistance, setPullDistance] = useState(0);
+    const pullStartY = React.useRef(0);
+    const listRef = React.useRef<HTMLDivElement>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (listRef.current && listRef.current.scrollTop === 0) {
+            pullStartY.current = e.touches[0].clientY;
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!listRef.current || listRef.current.scrollTop > 0 || pullStartY.current === 0) return;
+
+        const currentY = e.touches[0].clientY;
+        const diff = currentY - pullStartY.current;
+
+        if (diff > 0) {
+            setIsPulling(true);
+            // Add resistance
+            setPullDistance(Math.min(diff * 0.5, 80));
+        }
+    };
+
+    const handleTouchEnd = async () => {
+        if (isPulling && pullDistance > 50) {
+            await loadBuckets();
+        }
+        setIsPulling(false);
+        setPullDistance(0);
+        pullStartY.current = 0;
+    };
+
     const loadBuckets = async () => {
         setLoading(true);
         setError(null);
@@ -262,8 +296,20 @@ const BucketList: React.FC<BucketListProps> = ({ s3, selectedBucket, onSelectBuc
                 </div>
             </div>
 
+            {/* Pull Refresh Spinner */}
+            <div className="absolute top-28 left-0 right-0 flex justify-center z-0">
+                <Loader2 className={`w-6 h-6 text-blue-500 transition-all duration-200 ${isPulling ? 'opacity-100' : 'opacity-0'} ${pullDistance > 50 ? 'animate-spin' : ''}`} style={{ transform: `rotate(${pullDistance * 3}deg)` }} />
+            </div>
+
             {/* Bucket List */}
-            <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+            <div
+                ref={listRef}
+                className="flex-1 overflow-y-auto p-2 custom-scrollbar relative z-10 bg-background transition-transform duration-200 ease-out"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                style={{ transform: isPulling ? `translateY(${pullDistance}px)` : 'none' }}
+            >
                 {loading && buckets.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                         <Loader2 className="w-5 h-5 animate-spin mb-2 opacity-50" />

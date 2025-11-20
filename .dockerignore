@@ -1,0 +1,54 @@
+# Git and version control
+.git
+.gitignore
+.gitlab-ci.yml
+.github/
+
+# Docker
+.dockerignore
+Dockerfile
+
+# Dependencies (kept in Docker cache layer)
+node_modules
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build artifacts
+dist
+build
+*.local
+
+# Logs
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDEs and editors
+.idea/
+.vscode/
+.editorconfig
+*.swp
+*.swo
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Documentation and notes
+README.md
+*.md
+!Caddyfile
+
+# Keep these for build
+!index.html
+!vite.config.ts
+!tsconfig.json
