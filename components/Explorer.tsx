@@ -18,6 +18,10 @@ import DOMPurify from 'dompurify';
 import BottomSheet from './BottomSheet';
 import SwipeableListItem from './SwipeableListItem';
 import ImagePreview from './ImagePreview';
+import PDFViewer from './PDFViewer';
+import EPUBViewer from './EPUBViewer';
+import CodeViewer from './CodeViewer';
+import CodeEditor from './CodeEditor';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
 import { usePinchZoom } from '../hooks/usePinchZoom';
@@ -195,7 +199,7 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
     };
 
     // Preview
-    const [previewFile, setPreviewFile] = useState<{ file: FileObject, url: string, content?: string } | null>(null);
+    const [previewFile, setPreviewFile] = useState<{ file: FileObject, url: string, content?: string, data?: ArrayBuffer } | null>(null);
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editorContent, setEditorContent] = useState('');
@@ -725,6 +729,19 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                     console.error("Could not fetch PDF", e);
                     setPreviewFile({ file, url, content });
                 }
+            } else if (file.mimeType === 'application/epub+zip' || file.name.endsWith('.epub')) {
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const arrayBuffer = await res.arrayBuffer();
+                        setPreviewFile({ file, url, content, data: arrayBuffer });
+                    } else {
+                        setPreviewFile({ file, url, content });
+                    }
+                } catch (e) {
+                    console.error("Could not fetch EPUB", e);
+                    setPreviewFile({ file, url, content });
+                }
             } else {
                 setPreviewFile({ file, url, content });
             }
@@ -824,6 +841,8 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return <Package className={c("text-amber-600")} size={size} />;
         if (['js', 'ts', 'json', 'html', 'css', 'md', 'py', 'java'].includes(ext)) return <FileCode className={c("text-blue-500 dark:text-blue-400")} size={size} />;
         if (['mp3', 'wav', 'ogg'].includes(ext)) return <Music className={c("text-green-500 dark:text-green-400")} size={size} />;
+        if (['epub'].includes(ext)) return <BookOpen className={c("text-emerald-500 dark:text-emerald-400")} size={size} />;
+        if (['pdf'].includes(ext)) return <FileText className={c("text-red-500 dark:text-red-400")} size={size} />;
         return <FileIcon className={c("text-muted-foreground")} size={size} />;
     };
 
@@ -845,7 +864,37 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                 );
             }
 
-            // Code Editor with Line Numbers
+            // Code Editor with Syntax Highlighting
+            const ext = previewFile.file.name.split('.').pop()?.toLowerCase() || '';
+            const codeExtensions = ['js', 'jsx', 'ts', 'tsx', 'py', 'json', 'html', 'css', 'java', 'cpp', 'c', 'sh', 'sql', 'yaml', 'yml', 'go', 'rust', 'php', 'rb', 'swift', 'kt'];
+            const isCodeFile = codeExtensions.includes(ext);
+
+            if (isMarkdown && mdTab === 'preview') {
+                // Markdown Preview while editing
+                return (
+                    <div className="w-full h-full bg-background overflow-auto p-8 transition-colors">
+                        <div
+                            className="prose dark:prose-invert prose-sm max-w-3xl mx-auto"
+                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(editorPreviewHtml) }}
+                        />
+                    </div>
+                );
+            }
+
+            // Show syntax highlighted editor for code files
+            if (isCodeFile && !isMarkdown) {
+                return (
+                    <CodeEditor
+                        value={editorContent}
+                        language={ext}
+                        onChange={setEditorContent}
+                        fileName={previewFile.file.name}
+                        readOnly={false}
+                    />
+                );
+            }
+
+            // Plain text editor with line numbers
             const lineCount = editorContent.split('\n').length;
             const lines = Array.from({ length: lineCount }, (_, i) => i + 1);
 
@@ -862,25 +911,16 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                         </div>
                     </div>
 
-                    {isMarkdown && mdTab === 'preview' ? (
-                        <div className="flex-1 h-full bg-background overflow-auto p-8 transition-colors">
-                            <div
-                                className="prose dark:prose-invert prose-sm max-w-3xl mx-auto"
-                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(editorPreviewHtml) }}
-                            />
-                        </div>
-                    ) : (
-                        <textarea
-                            className="flex-1 h-full bg-background text-foreground text-sm p-4 outline-none resize-none transition-colors leading-6 whitespace-pre"
-                            value={editorContent}
-                            onChange={(e) => setEditorContent(e.target.value)}
-                            onScroll={(e) => setEditorScrollTop(e.currentTarget.scrollTop)}
-                            spellCheck={false}
-                            placeholder="Start typing..."
-                            autoFocus
-                            wrap="off"
-                        />
-                    )}
+                    <textarea
+                        className="flex-1 h-full bg-background text-foreground text-sm p-4 outline-none resize-none transition-colors leading-6 whitespace-pre"
+                        value={editorContent}
+                        onChange={(e) => setEditorContent(e.target.value)}
+                        onScroll={(e) => setEditorScrollTop(e.currentTarget.scrollTop)}
+                        spellCheck={false}
+                        placeholder="Start typing..."
+                        autoFocus
+                        wrap="off"
+                    />
                 </div>
             );
         }
@@ -898,7 +938,15 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                     </div>
                 );
             }
-            // Text View Mode
+            // Code View Mode with Syntax Highlighting
+            const ext = previewFile.file.name.split('.').pop()?.toLowerCase() || '';
+            const codeExtensions = ['js', 'jsx', 'ts', 'tsx', 'py', 'json', 'html', 'css', 'java', 'cpp', 'c', 'sh', 'sql', 'yaml', 'yml', 'go', 'rust', 'php', 'rb', 'swift', 'kt'];
+            
+            if (codeExtensions.includes(ext)) {
+                return <CodeViewer code={previewFile.content} language={ext} fileName={previewFile.file.name} />;
+            }
+            
+            // Plain Text View Mode
             return (
                 <div className="w-full h-full bg-background overflow-auto p-4 transition-colors">
                     <pre className="font-mono text-sm text-foreground whitespace-pre-wrap">{previewFile.content}</pre>
@@ -922,11 +970,17 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                 ) : previewFile.file.mimeType?.startsWith('audio') ? (
                     <audio src={previewFile.url} controls className="w-full max-w-md" />
                 ) : previewFile.file.mimeType === 'application/pdf' || previewFile.file.name.endsWith('.pdf') ? (
-                    <iframe
-                        src={previewFile.url}
-                        className="w-full h-full border-0 rounded-sm shadow-2xl"
-                        title="PDF Preview"
-                    />
+                    isMobile ? (
+                        <PDFViewer url={previewFile.url} fileName={previewFile.file.name} />
+                    ) : (
+                        <iframe
+                            src={previewFile.url}
+                            className="w-full h-full border-0 rounded-sm shadow-2xl"
+                            title="PDF Preview"
+                        />
+                    )
+                ) : previewFile.file.mimeType === 'application/epub+zip' || previewFile.file.name.endsWith('.epub') ? (
+                    <EPUBViewer url={previewFile.url} data={previewFile.data} fileName={previewFile.file.name} />
                 ) : (
                     <div className="text-center text-muted-foreground">
                         <FileIcon size={64} className="mx-auto mb-4 opacity-20" />
@@ -1348,7 +1402,15 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                         <div className="h-16 flex items-center justify-between px-4 md:px-6 border-b border-border bg-background z-40">
                             <div className="flex flex-col min-w-0 mr-4">
                                 <span className="font-medium text-foreground text-sm truncate">{previewFile.file.name}</span>
-                                <span className="text-xs text-muted-foreground">{formatBytes(previewFile.file.size)}</span>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>{formatBytes(previewFile.file.size)}</span>
+                                    {typeof previewFile.content === 'string' && (
+                                        <>
+                                            <span>•</span>
+                                            <span>{previewFile.content.split('\n').length.toLocaleString()} {previewFile.content.split('\n').length === 1 ? 'line' : 'lines'}</span>
+                                        </>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Markdown Tabs */}

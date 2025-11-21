@@ -43,6 +43,7 @@
   <meta name="apple-mobile-web-app-title" content="S4" />
   <link rel="manifest" href="/manifest.json" />
 
+  <!-- Tailwind CDN: Using CDN for rapid development. For production optimization, consider PostCSS setup. -->
   <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
   <script>
     tailwind.config = {
@@ -221,11 +222,15 @@
     "@aws-sdk/lib-storage": "https://esm.sh/@aws-sdk/lib-storage@3.620.1?target=es2022&platform=browser&bundle=true",
     "jszip": "https://esm.sh/jszip@3.10.1",
     "marked": "https://esm.sh/marked@12.0.0",
-    "dompurify": "https://esm.sh/dompurify@3.0.9"
+    "dompurify": "https://esm.sh/dompurify@3.0.9",
+    "epubjs": "https://esm.sh/epubjs@0.3.93",
+    "react-pdf": "https://esm.sh/react-pdf@10.2.0",
+    "pdfjs-dist": "https://esm.sh/pdfjs-dist@5.4.394",
+    "prismjs": "https://esm.sh/prismjs@1.29.0",
+    "prismjs/": "https://esm.sh/prismjs@1.29.0/"
   }
 }
 </script>
-  <link rel="stylesheet" href="/index.css">
 
   <!-- Service Worker Registration -->
   <script>

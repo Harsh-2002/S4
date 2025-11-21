@@ -328,7 +328,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                     <FeatureCard
                         icon={<Eye className="text-pink-500" />}
                         title="Instant Previews"
-                        description="Preview images, videos, PDFs, and markdown files with syntax highlighting instantly without downloading them."
+                        description="Preview images, videos, PDFs, EPUB books, and markdown files with syntax highlighting instantly without downloading them."
                         color="bg-pink-500/10"
                     />
                     <FeatureCard
