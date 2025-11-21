@@ -96,6 +96,42 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
 
     const isMobile = useIsMobile();
 
+    // Global Drag and Drop for Uploads
+    const handleGlobalDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isDraggingOver) setIsDraggingOver(true);
+    };
+
+    const handleGlobalDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Only set false if we're leaving the main container, not entering a child
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+        setIsDraggingOver(false);
+    };
+
+    const handleGlobalDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDraggingOver(false);
+
+        // Check if files were dropped (OS drag and drop)
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const files = Array.from(e.dataTransfer.files);
+            // Upload each file
+            files.forEach(file => {
+                onUpload(file, currentPrefix, () => {
+                    setRefreshTrigger(p => p + 1);
+                });
+            });
+            return;
+        }
+        
+        // Handle internal drag and drop (move) if it bubbled up here
+        // (Though usually handled by specific drop targets)
+    };
+
     // Edge swipe for back navigation
     const { handlers: edgeSwipeHandlers, swipeProgress, isEdgeSwipe } = useEdgeSwipe({
         onSwipeComplete: () => {
@@ -871,19 +907,19 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                     console.error("Could not fetch EPUB", e);
                     setPreviewFile({ file, url, content });
                 }
-            } else if (file.name.endsWith('.csv')) {
+            } else if (file.name.toLowerCase().endsWith('.csv')) {
                 // CSV files
                 setPreviewFile({ file, url, content: 'csv' });
-            } else if (file.name.endsWith('.docx') || file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+            } else if (file.name.toLowerCase().endsWith('.docx') || file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
                 // Word Document
                 setPreviewFile({ file, url, content: 'docx' });
-            } else if (file.name.endsWith('.xlsx') || file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+            } else if (file.name.toLowerCase().endsWith('.xlsx') || file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
                 // Excel Spreadsheet
                 setPreviewFile({ file, url, content: 'xlsx' });
-            } else if (file.name.endsWith('.doc') || file.mimeType === 'application/msword') {
+            } else if (file.name.toLowerCase().endsWith('.doc') || file.mimeType === 'application/msword') {
                 // Legacy Word Document - show as unavailable
                 setPreviewFile({ file, url, content: 'unsupported-legacy' });
-            } else if (file.name.endsWith('.xls') || file.mimeType === 'application/vnd.ms-excel') {
+            } else if (file.name.toLowerCase().endsWith('.xls') || file.mimeType === 'application/vnd.ms-excel') {
                 // Legacy Excel - show as unavailable
                 setPreviewFile({ file, url, content: 'unsupported-legacy' });
             } else if (file.mimeType?.startsWith('image/')) {
@@ -1195,7 +1231,18 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         <div
             className="flex flex-col h-full relative bg-background select-none transition-colors duration-300"
             {...edgeSwipeHandlers}
+            onDragOver={handleGlobalDragOver}
+            onDragLeave={handleGlobalDragLeave}
+            onDrop={handleGlobalDrop}
         >
+            {/* Global Drag Overlay */}
+            {isDraggingOver && (
+                <div className="absolute inset-0 z-[300] bg-blue-500/20 backdrop-blur-sm border-4 border-blue-500 border-dashed m-4 rounded-xl flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-200">
+                    <UploadCloud className="w-24 h-24 text-blue-500 mb-4 animate-bounce" />
+                    <h3 className="text-2xl font-bold text-blue-600 dark:text-blue-400">Drop files to upload</h3>
+                </div>
+            )}
+
             {/* Edge Swipe Back Indicator */}
             {isEdgeSwipe && (
                 <div className="fixed left-0 top-0 bottom-0 z-[200] flex items-center justify-start pl-4 pointer-events-none bg-gradient-to-r from-black/10 to-transparent w-24 transition-opacity" style={{ opacity: swipeProgress }}>
