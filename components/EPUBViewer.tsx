@@ -173,15 +173,15 @@ const EPUBViewer: React.FC<EPUBViewerProps> = ({ url, fileName, data }) => {
     return (
         <div className="w-full h-full flex flex-col bg-secondary/10">
             {/* Toolbar */}
-            <div className="flex items-center justify-between px-2 md:px-4 py-3 bg-background border-b border-border shrink-0">
+            <div className="flex items-center justify-between px-3 md:px-4 py-3 bg-background border-b border-border shrink-0">
                 <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
                     <BookIcon size={18} className="text-primary shrink-0" />
-                    <span className="text-xs md:text-sm font-medium truncate" title={fileName}>
+                    <span className="text-sm font-medium truncate" title={fileName}>
                         {fileName}
                     </span>
                 </div>
 
-                <div className="flex items-center gap-1 md:gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
                     <button
                         onClick={goToPrevPage}
                         disabled={loading}

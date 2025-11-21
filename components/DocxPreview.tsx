@@ -112,12 +112,12 @@ const DocxPreview: React.FC<DocxPreviewProps> = ({ url, fileName }) => {
         </div>
       )}
 
-      <div className="h-full w-full overflow-auto p-2 md:p-8">
+      <div className="h-full w-full overflow-auto p-4 md:p-8">
         <style>{`
           .docx-wrapper {
             background: transparent;
             padding: 0;
-            max-width: 100%;
+            max-width: 650px;
             margin: 0 auto;
           }
           
@@ -131,9 +131,9 @@ const DocxPreview: React.FC<DocxPreviewProps> = ({ url, fileName }) => {
             background: white !important;
             color: black !important;
             border: 1px solid #e5e7eb;
-            margin-bottom: 0.5rem;
-            padding: 1rem !important;
-            box-shadow: none;
+            margin-bottom: 1rem;
+            padding: 1.5rem !important;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
           }
           
           @media (min-width: 768px) {
