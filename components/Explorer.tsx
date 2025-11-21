@@ -92,45 +92,7 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
     const [loading, setLoading] = useState(false);
     const [viewError, setViewError] = useState<{ title: string, message: string, code?: string, docLink?: string, details?: string } | null>(null);
     const [editorPreviewHtml, setEditorPreviewHtml] = useState('');
-    const [isDraggingOver, setIsDraggingOver] = useState(false);
-
     const isMobile = useIsMobile();
-
-    // Global Drag and Drop for Uploads
-    const handleGlobalDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!isDraggingOver) setIsDraggingOver(true);
-    };
-
-    const handleGlobalDragLeave = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        // Only set false if we're leaving the main container, not entering a child
-        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-        setIsDraggingOver(false);
-    };
-
-    const handleGlobalDrop = async (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDraggingOver(false);
-
-        // Check if files were dropped (OS drag and drop)
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            const files = Array.from(e.dataTransfer.files);
-            // Upload each file
-            files.forEach(file => {
-                onUpload(file, currentPrefix, () => {
-                    setRefreshTrigger(p => p + 1);
-                });
-            });
-            return;
-        }
-        
-        // Handle internal drag and drop (move) if it bubbled up here
-        // (Though usually handled by specific drop targets)
-    };
 
     // Edge swipe for back navigation
     const { handlers: edgeSwipeHandlers, swipeProgress, isEdgeSwipe } = useEdgeSwipe({
@@ -1231,18 +1193,7 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         <div
             className="flex flex-col h-full relative bg-background select-none transition-colors duration-300"
             {...edgeSwipeHandlers}
-            onDragOver={handleGlobalDragOver}
-            onDragLeave={handleGlobalDragLeave}
-            onDrop={handleGlobalDrop}
         >
-            {/* Global Drag Overlay */}
-            {isDraggingOver && (
-                <div className="absolute inset-0 z-[300] bg-blue-500/20 backdrop-blur-sm border-4 border-blue-500 border-dashed m-4 rounded-xl flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-200">
-                    <UploadCloud className="w-24 h-24 text-blue-500 mb-4 animate-bounce" />
-                    <h3 className="text-2xl font-bold text-blue-600 dark:text-blue-400">Drop files to upload</h3>
-                </div>
-            )}
-
             {/* Edge Swipe Back Indicator */}
             {isEdgeSwipe && (
                 <div className="fixed left-0 top-0 bottom-0 z-[200] flex items-center justify-start pl-4 pointer-events-none bg-gradient-to-r from-black/10 to-transparent w-24 transition-opacity" style={{ opacity: swipeProgress }}>
@@ -2242,36 +2193,10 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
             {/* File Area */}
             <div
                 ref={listRef}
-                className={`flex-1 overflow-y-auto bg-background overscroll-none pb-4 md:pb-20 relative z-10 transition-all duration-200 ease-out ${isDraggingOver ? 'bg-blue-500/5 ring-2 ring-blue-500 ring-inset' : ''}`}
+                className="flex-1 overflow-y-auto bg-background overscroll-none pb-4 md:pb-20 relative z-10 transition-all duration-200 ease-out"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
-                onDragOver={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.dataTransfer.dropEffect = 'copy';
-                    setIsDraggingOver(true);
-                }}
-                onDragEnter={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setIsDraggingOver(true);
-                }}
-                onDragLeave={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    // Only set false if leaving the main container, not entering a child
-                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                    setIsDraggingOver(false);
-                }}
-                onDrop={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setIsDraggingOver(false);
-                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                        Array.from(e.dataTransfer.files).forEach(f => onUpload(f, currentPrefix, () => setRefreshTrigger(p => p + 1)));
-                    }
-                }}
                 style={{ transform: isPulling ? `translateY(${pullDistance}px)` : 'none' }}
             >
 
