@@ -9,7 +9,8 @@ import {
     Film, Package, FileCode, File as FileIcon, RefreshCw, List, Grid,
     AlertTriangle, AlertCircle, PenTool, BookOpen, MousePointer2, CheckCircle2,
     ShieldAlert, Lock, FolderInput, TerminalSquare, HardDrive, UploadCloud,
-    FileJson, FileSpreadsheet, Terminal, Binary
+    FileJson, FileSpreadsheet, Terminal, Binary, FolderPlus, Type, ArrowUpDown,
+    ArrowUp, ArrowDown, Info, Calendar, HardDriveDownload, Tag
 } from 'lucide-react';
 import { S3Service, formatBytes } from '../services/s3Service';
 import { FileObject, BucketObject, ViewMode } from '../types';
@@ -22,7 +23,12 @@ import PDFViewer from './PDFViewer';
 import EPUBViewer from './EPUBViewer';
 import CodeViewer from './CodeViewer';
 import CodeEditor from './CodeEditor';
+import CSVViewer from './CSVViewer';
+import HexViewer from './HexViewer';
+import DocxPreview from './DocxPreview';
+import XlsxPreview from './XlsxPreview';
 import { useIsMobile } from '../hooks/useIsMobile';
+import exifr from 'exifr';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
 import { usePinchZoom } from '../hooks/usePinchZoom';
 import { useEdgeSwipe } from '../hooks/useEdgeSwipe';
@@ -227,6 +233,17 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
     const [moveModal, setMoveModal] = useState<{ show: boolean, targetBucket: string, targetPrefix: string, bucketList: BucketObject[] }>({
         show: false, targetBucket: bucketName, targetPrefix: currentPrefix, bucketList: []
     });
+    const [renameModal, setRenameModal] = useState<{ show: boolean, file: FileObject | null, newName: string }>({
+        show: false, file: null, newName: ''
+    });
+    const [createFolderModal, setCreateFolderModal] = useState<{ show: boolean, folderName: string }>({
+        show: false, folderName: ''
+    });
+    const [sortBy, setSortBy] = useState<'name' | 'size' | 'date'>('name');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+    const [showMetadata, setShowMetadata] = useState(false);
+    const [metadataFile, setMetadataFile] = useState<FileObject | null>(null);
+    const [exifData, setExifData] = useState<any>(null);
     const [actionError, setActionError] = useState<{ show: boolean, title: string, message: string, details?: string, docLink?: string } | null>(null);
 
     // UI State
@@ -307,6 +324,17 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
     // Keyboard Shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Spacebar for Quick Look (desktop only) - like macOS preview
+            if (e.key === ' ' && !isMobile && !isEditing && !previewFile && !createFileModal.show && !actionError?.show && !moveModal.show) {
+                e.preventDefault();
+                if (selectedKeys.size === 1) {
+                    const selectedKey = Array.from(selectedKeys)[0];
+                    const file = files.find(f => f.key === selectedKey);
+                    if (file && !file.isFolder) {
+                        handlePreview(file);
+                    }
+                }
+            }
             // Delete
             if (e.key === 'Backspace' || e.key === 'Delete') {
                 if (selectedKeys.size > 0 && !readOnly && !isEditing && !previewFile && !createFileModal.show && !actionError?.show && !moveModal.show) {
@@ -335,7 +363,7 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedKeys, readOnly, previewFile, isEditing, selectionMode, createFileModal.show, deleteConfirmation.show, actionError, moveModal.show]);
+    }, [selectedKeys, readOnly, previewFile, isEditing, selectionMode, createFileModal.show, deleteConfirmation.show, actionError, moveModal.show, files, isMobile]);
 
     const loadFiles = async () => {
         setLoading(true);
@@ -376,7 +404,25 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         setCurrentPrefix(parts.length > 0 ? parts.join('/') + '/' : '');
     };
 
-    const filteredFiles = files.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
+    // Filter and sort files
+    const filteredFiles = files
+        .filter(f => f.name.toLowerCase().includes(search.toLowerCase()))
+        .sort((a, b) => {
+            // Always sort folders first
+            if (a.isFolder && !b.isFolder) return -1;
+            if (!a.isFolder && b.isFolder) return 1;
+
+            let comparison = 0;
+            if (sortBy === 'name') {
+                comparison = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+            } else if (sortBy === 'size') {
+                comparison = a.size - b.size;
+            } else if (sortBy === 'date') {
+                comparison = a.lastModified.getTime() - b.lastModified.getTime();
+            }
+
+            return sortDirection === 'asc' ? comparison : -comparison;
+        });
 
     // --- INTERACTION LOGIC ---
 
@@ -654,6 +700,89 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         }
     };
 
+    // Rename file/folder
+    const openRenameModal = (file: FileObject) => {
+        // Extract just the filename without prefix
+        const nameWithoutPrefix = file.name;
+        setRenameModal({ show: true, file, newName: nameWithoutPrefix });
+    };
+
+    const handleRename = async () => {
+        if (!renameModal.file || !renameModal.newName.trim()) return;
+        
+        const file = renameModal.file;
+        const newName = renameModal.newName.trim();
+        
+        // Don't allow empty names or just whitespace
+        if (newName === file.name) {
+            setRenameModal({ show: false, file: null, newName: '' });
+            return;
+        }
+
+        setProcessingState("Renaming...");
+        try {
+            // Calculate old and new keys
+            const oldKey = file.key;
+            const keyParts = oldKey.split('/');
+            keyParts[keyParts.length - 1] = newName;
+            const newKey = keyParts.join('/');
+
+            if (file.isFolder) {
+                // Rename folder by moving all contents
+                await s3.moveFolder(bucketName, oldKey, bucketName, newKey);
+            } else {
+                // Rename file
+                await s3.moveObject(bucketName, oldKey, bucketName, newKey);
+            }
+
+            setNotification(`Renamed to "${newName}"`);
+            setRenameModal({ show: false, file: null, newName: '' });
+            setRefreshTrigger(p => p + 1);
+        } catch (e: any) {
+            const errInfo = getAwsErrorMessage(e);
+            setActionError({
+                show: true,
+                title: "Rename Failed",
+                message: errInfo.message,
+                details: errInfo.details,
+                docLink: errInfo.docLink
+            });
+        } finally {
+            setProcessingState(null);
+        }
+    };
+
+    // Create folder
+    const handleCreateFolder = async () => {
+        if (!createFolderModal.folderName.trim()) return;
+        
+        const folderName = createFolderModal.folderName.trim();
+        // Ensure folder name ends with /
+        const normalizedName = folderName.endsWith('/') ? folderName : folderName + '/';
+        
+        setProcessingState("Creating folder...");
+        try {
+            const folderKey = `${currentPrefix}${normalizedName}`;
+            // Create folder marker (empty object with trailing slash)
+            await s3.saveFileContent(folderKey, '', 'application/x-directory');
+            
+            setNotification(`Folder "${folderName}" created`);
+            setCreateFolderModal({ show: false, folderName: '' });
+            setRefreshTrigger(p => p + 1);
+        } catch (e: any) {
+            const errInfo = getAwsErrorMessage(e);
+            setActionError({
+                show: true,
+                title: "Failed to Create Folder",
+                message: errInfo.message,
+                details: errInfo.details,
+                docLink: errInfo.docLink
+            });
+        } finally {
+            setProcessingState(null);
+        }
+    };
+
     // Preview & Editing
     // Update editor preview when tab changes or content changes
     useEffect(() => {
@@ -742,8 +871,40 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                     console.error("Could not fetch EPUB", e);
                     setPreviewFile({ file, url, content });
                 }
-            } else {
+            } else if (file.name.endsWith('.csv')) {
+                // CSV files
+                setPreviewFile({ file, url, content: 'csv' });
+            } else if (file.name.endsWith('.docx') || file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                // Word Document
+                setPreviewFile({ file, url, content: 'docx' });
+            } else if (file.name.endsWith('.xlsx') || file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+                // Excel Spreadsheet
+                setPreviewFile({ file, url, content: 'xlsx' });
+            } else if (file.name.endsWith('.doc') || file.mimeType === 'application/msword') {
+                // Legacy Word Document - show as unavailable
+                setPreviewFile({ file, url, content: 'unsupported-legacy' });
+            } else if (file.name.endsWith('.xls') || file.mimeType === 'application/vnd.ms-excel') {
+                // Legacy Excel - show as unavailable
+                setPreviewFile({ file, url, content: 'unsupported-legacy' });
+            } else if (file.mimeType?.startsWith('image/')) {
+                // Try to extract EXIF data from images
+                try {
+                    const exif = await exifr.parse(url);
+                    setExifData(exif || null);
+                } catch (e) {
+                    console.log("No EXIF data available");
+                    setExifData(null);
+                }
                 setPreviewFile({ file, url, content });
+            } else {
+                // Check if it's a binary file that should be shown in hex viewer
+                const binaryExtensions = ['bin', 'dat', 'exe', 'dll', 'so', 'dylib', 'class', 'pyc'];
+                const ext = file.name.split('.').pop()?.toLowerCase();
+                if (ext && binaryExtensions.includes(ext)) {
+                    setPreviewFile({ file, url, content: 'binary' });
+                } else {
+                    setPreviewFile({ file, url, content });
+                }
             }
         } catch (e) {
             // If getting presigned URL fails (likely 403)
@@ -806,6 +967,8 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         setPreviewFile(null);
         setIsEditing(false);
         setMdTab('write');
+        setShowMetadata(false);
+        setExifData(null);
     };
 
     // Share Functionality
@@ -839,6 +1002,8 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) return <ImageIcon className={c("text-purple-500 dark:text-purple-400")} size={size} />;
         if (['mp4', 'mov', 'webm', 'avi'].includes(ext)) return <Film className={c("text-rose-500")} size={size} />;
         if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return <Package className={c("text-amber-600")} size={size} />;
+        if (['docx', 'doc'].includes(ext)) return <FileText className={c("text-blue-500 dark:text-blue-400")} size={size} />;
+        if (['xlsx', 'xls', 'csv'].includes(ext)) return <FileSpreadsheet className={c("text-green-600 dark:text-green-500")} size={size} />;
         if (['js', 'ts', 'json', 'html', 'css', 'md', 'py', 'java'].includes(ext)) return <FileCode className={c("text-blue-500 dark:text-blue-400")} size={size} />;
         if (['mp3', 'wav', 'ogg'].includes(ext)) return <Music className={c("text-green-500 dark:text-green-400")} size={size} />;
         if (['epub'].includes(ext)) return <BookOpen className={c("text-emerald-500 dark:text-emerald-400")} size={size} />;
@@ -925,6 +1090,37 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
             );
         }
 
+        // Special Content Markers (CSV, Office, Binary)
+        if (previewFile.content === 'csv') {
+            return <CSVViewer url={previewFile.url} fileName={previewFile.file.name} />;
+        }
+        if (previewFile.content === 'binary') {
+            return <HexViewer url={previewFile.url} fileName={previewFile.file.name} />;
+        }
+        if (previewFile.content === 'docx') {
+            return <DocxPreview url={previewFile.url} fileName={previewFile.file.name} />;
+        }
+        if (previewFile.content === 'xlsx') {
+            return <XlsxPreview url={previewFile.url} fileName={previewFile.file.name} />;
+        }
+        if (previewFile.content === 'unsupported-legacy') {
+            return (
+                <div className="flex flex-col items-center justify-center h-full p-4 text-center bg-background">
+                    <AlertCircle className="w-12 h-12 text-yellow-500 mb-2" />
+                    <p className="font-medium text-foreground">Legacy Format Not Supported</p>
+                    <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                        This file uses an older format (.doc, .xls, .ppt). For preview support, please convert to modern Office format (.docx, .xlsx, .pptx).
+                    </p>
+                    <button 
+                        onClick={() => handleDownload(previewFile.file)} 
+                        className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+                    >
+                        <Download size={16} /> Download File
+                    </button>
+                </div>
+            );
+        }
+
         // Not editing (View Mode)
         if (previewFile.content !== undefined) {
             if (isMarkdown) {
@@ -955,6 +1151,8 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
         }
 
         // Media/Binary Preview
+
+
         return (
             <div className="w-full h-full flex items-center justify-center p-4 bg-secondary/10 transition-colors">
                 {previewFile.file.mimeType?.startsWith('image') ? (
@@ -1249,6 +1447,168 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                 </div>
             )}
 
+            {/* Create Folder Modal */}
+            {createFolderModal.show && (
+                isMobile ? (
+                    <BottomSheet
+                        isOpen={createFolderModal.show}
+                        onClose={() => setCreateFolderModal({ show: false, folderName: '' })}
+                        title="Create New Folder"
+                        height="auto"
+                    >
+                        <div className="space-y-6 pb-4">
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground block mb-2">Folder Name</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-secondary border border-input rounded-lg px-4 py-3 text-base focus:border-foreground outline-none"
+                                    placeholder="my-folder"
+                                    value={createFolderModal.folderName}
+                                    onChange={(e) => setCreateFolderModal({ ...createFolderModal, folderName: e.target.value })}
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={handleCreateFolder}
+                                    disabled={!createFolderModal.folderName.trim()}
+                                    className="w-full bg-blue-600 text-white py-3.5 rounded-xl text-base font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 active:scale-[0.98]"
+                                >
+                                    Create Folder
+                                </button>
+                                <button
+                                    onClick={() => setCreateFolderModal({ show: false, folderName: '' })}
+                                    className="w-full bg-secondary text-foreground py-3.5 rounded-xl text-base font-medium hover:bg-secondary/80 active:scale-[0.98]"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </BottomSheet>
+                ) : (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setCreateFolderModal({ show: false, folderName: '' })}>
+                        <div className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                                    <FolderPlus className="text-blue-500 w-5 h-5" />
+                                </div>
+                                <h3 className="text-lg font-semibold">Create New Folder</h3>
+                            </div>
+                            <div className="mb-6">
+                                <label className="text-xs font-medium text-muted-foreground block mb-2">Folder Name</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-secondary border border-input rounded-md px-3 py-2 text-sm focus:border-foreground outline-none"
+                                    placeholder="my-folder"
+                                    value={createFolderModal.folderName}
+                                    onChange={(e) => setCreateFolderModal({ ...createFolderModal, folderName: e.target.value })}
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    onClick={() => setCreateFolderModal({ show: false, folderName: '' })}
+                                    className="px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleCreateFolder}
+                                    disabled={!createFolderModal.folderName.trim()}
+                                    className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+                                >
+                                    Create
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            )}
+
+            {/* Rename Modal */}
+            {renameModal.show && renameModal.file && (
+                isMobile ? (
+                    <BottomSheet
+                        isOpen={renameModal.show}
+                        onClose={() => setRenameModal({ show: false, file: null, newName: '' })}
+                        title={`Rename ${renameModal.file.isFolder ? 'Folder' : 'File'}`}
+                        height="auto"
+                    >
+                        <div className="space-y-6 pb-4">
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground block mb-2">New Name</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-secondary border border-input rounded-lg px-4 py-3 text-base focus:border-foreground outline-none font-mono"
+                                    placeholder={renameModal.file.name}
+                                    value={renameModal.newName}
+                                    onChange={(e) => setRenameModal({ ...renameModal, newName: e.target.value })}
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && renameModal.newName.trim()) handleRename();
+                                    }}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={handleRename}
+                                    disabled={!renameModal.newName.trim()}
+                                    className="w-full bg-blue-600 text-white py-3.5 rounded-xl text-base font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 active:scale-[0.98]"
+                                >
+                                    Rename
+                                </button>
+                                <button
+                                    onClick={() => setRenameModal({ show: false, file: null, newName: '' })}
+                                    className="w-full bg-secondary text-foreground py-3.5 rounded-xl text-base font-medium hover:bg-secondary/80 active:scale-[0.98]"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </BottomSheet>
+                ) : (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setRenameModal({ show: false, file: null, newName: '' })}>
+                        <div className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                                    <Edit2 className="text-blue-500 w-5 h-5" />
+                                </div>
+                                <h3 className="text-lg font-semibold">Rename {renameModal.file.isFolder ? 'Folder' : 'File'}</h3>
+                            </div>
+                            <div className="mb-6">
+                                <label className="text-xs font-medium text-muted-foreground block mb-2">New Name</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-secondary border border-input rounded-md px-3 py-2 text-sm focus:border-foreground outline-none font-mono"
+                                    placeholder={renameModal.file.name}
+                                    value={renameModal.newName}
+                                    onChange={(e) => setRenameModal({ ...renameModal, newName: e.target.value })}
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && renameModal.newName.trim()) handleRename();
+                                    }}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    onClick={() => setRenameModal({ show: false, file: null, newName: '' })}
+                                    className="px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleRename}
+                                    disabled={!renameModal.newName.trim()}
+                                    className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+                                >
+                                    Rename
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            )}
+
             {/* Delete Confirmation Modal */}
             {deleteConfirmation.show && (
                 isMobile ? (
@@ -1432,13 +1792,14 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                             )}
 
                             <div className="flex items-center gap-2">
-                                {previewFile.content !== undefined && !readOnly && (
+                                {previewFile.content !== undefined && !readOnly && !['csv', 'binary', 'docx', 'xlsx', 'unsupported-legacy'].includes(previewFile.content as string) && (
                                     isEditing ? (
                                         <button onClick={saveEditedContent} className="px-3 py-1.5 bg-green-600 text-white rounded text-xs font-medium flex items-center gap-2 hover:bg-green-500 shadow-sm"><Save size={14} /> Save</button>
                                     ) : (
                                         <button onClick={() => setIsEditing(true)} className="px-3 py-1.5 bg-secondary text-foreground rounded text-xs font-medium flex items-center gap-2 hover:bg-secondary/80 border border-border"><Edit2 size={14} /> Edit</button>
                                     )
                                 )}
+                                <button onClick={() => setShowMetadata(!showMetadata)} className={`p-2 rounded transition-colors ${showMetadata ? 'bg-secondary text-foreground' : 'hover:bg-secondary text-muted-foreground hover:text-foreground'}`} title="Info"><Info size={18} /></button>
                                 <button onClick={() => openShareModal(previewFile.file)} className="p-2 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title="Share"><Share2 size={18} /></button>
                                 <button onClick={() => handleDownload(previewFile.file)} className="p-2 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title="Download"><Download size={18} /></button>
                                 <button onClick={closePreview} className="p-2 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors" title="Close"><X size={18} /></button>
@@ -1449,6 +1810,225 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                         <div className="flex-1 overflow-hidden flex items-center justify-center relative bg-background transition-colors">
                             {renderContent()}
                         </div>
+
+                        {/* Metadata Panel */}
+                        {showMetadata && (
+                            isMobile ? (
+                                <BottomSheet onClose={() => setShowMetadata(false)}>
+                                    <div className="p-4">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="text-lg font-semibold text-foreground">File Information</h3>
+                                            <button onClick={() => setShowMetadata(false)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+                                                <X size={20} />
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="space-y-4">
+                                            {/* Basic File Info */}
+                                            <div className="space-y-2">
+                                                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Properties</h4>
+                                                <div className="space-y-2 text-sm">
+                                                    <div className="flex justify-between py-1">
+                                                        <span className="text-muted-foreground">Size:</span>
+                                                        <span className="font-medium text-foreground">{formatBytes(previewFile.file.size)}</span>
+                                                    </div>
+                                                    {previewFile.file.lastModified && (
+                                                        <div className="flex justify-between py-1">
+                                                            <span className="text-muted-foreground">Modified:</span>
+                                                            <span className="font-medium text-foreground">{new Date(previewFile.file.lastModified).toLocaleString()}</span>
+                                                        </div>
+                                                    )}
+                                                    {previewFile.file.mimeType && (
+                                                        <div className="flex justify-between py-1">
+                                                            <span className="text-muted-foreground">Type:</span>
+                                                            <span className="font-medium text-foreground">{previewFile.file.mimeType}</span>
+                                                        </div>
+                                                    )}
+                                                    {previewFile.file.eTag && (
+                                                        <div className="flex justify-between py-1">
+                                                            <span className="text-muted-foreground">ETag:</span>
+                                                            <span className="font-mono text-xs text-foreground truncate max-w-[200px]">{previewFile.file.eTag}</span>
+                                                        </div>
+                                                    )}
+                                                    {previewFile.file.storageClass && (
+                                                        <div className="flex justify-between py-1">
+                                                            <span className="text-muted-foreground">Storage:</span>
+                                                            <span className="font-medium text-foreground">{previewFile.file.storageClass}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* EXIF Data */}
+                                            {exifData && (
+                                                <div className="space-y-2 pt-4 border-t border-border">
+                                                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">EXIF Data</h4>
+                                                    <div className="space-y-2 text-sm">
+                                                        {exifData.Make && exifData.Model && (
+                                                            <div className="flex justify-between py-1">
+                                                                <span className="text-muted-foreground">Camera:</span>
+                                                                <span className="font-medium text-foreground">{exifData.Make} {exifData.Model}</span>
+                                                            </div>
+                                                        )}
+                                                        {exifData.DateTimeOriginal && (
+                                                            <div className="flex justify-between py-1">
+                                                                <span className="text-muted-foreground">Taken:</span>
+                                                                <span className="font-medium text-foreground">{new Date(exifData.DateTimeOriginal).toLocaleString()}</span>
+                                                            </div>
+                                                        )}
+                                                        {(exifData.ImageWidth || exifData.ExifImageWidth) && (exifData.ImageHeight || exifData.ExifImageHeight) && (
+                                                            <div className="flex justify-between py-1">
+                                                                <span className="text-muted-foreground">Dimensions:</span>
+                                                                <span className="font-medium text-foreground">{exifData.ImageWidth || exifData.ExifImageWidth} × {exifData.ImageHeight || exifData.ExifImageHeight}</span>
+                                                            </div>
+                                                        )}
+                                                        {exifData.ISO && (
+                                                            <div className="flex justify-between py-1">
+                                                                <span className="text-muted-foreground">ISO:</span>
+                                                                <span className="font-medium text-foreground">{exifData.ISO}</span>
+                                                            </div>
+                                                        )}
+                                                        {exifData.FNumber && (
+                                                            <div className="flex justify-between py-1">
+                                                                <span className="text-muted-foreground">Aperture:</span>
+                                                                <span className="font-medium text-foreground">f/{exifData.FNumber}</span>
+                                                            </div>
+                                                        )}
+                                                        {exifData.ExposureTime && (
+                                                            <div className="flex justify-between py-1">
+                                                                <span className="text-muted-foreground">Shutter:</span>
+                                                                <span className="font-medium text-foreground">{exifData.ExposureTime < 1 ? `1/${Math.round(1 / exifData.ExposureTime)}s` : `${exifData.ExposureTime}s`}</span>
+                                                            </div>
+                                                        )}
+                                                        {exifData.FocalLength && (
+                                                            <div className="flex justify-between py-1">
+                                                                <span className="text-muted-foreground">Focal Length:</span>
+                                                                <span className="font-medium text-foreground">{exifData.FocalLength}mm</span>
+                                                            </div>
+                                                        )}
+                                                        {(exifData.latitude || exifData.GPSLatitude) && (exifData.longitude || exifData.GPSLongitude) && (
+                                                            <div className="flex justify-between py-1">
+                                                                <span className="text-muted-foreground">GPS:</span>
+                                                                <span className="font-mono text-xs text-foreground">
+                                                                    {(exifData.latitude || exifData.GPSLatitude).toFixed(6)}, {(exifData.longitude || exifData.GPSLongitude).toFixed(6)}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </BottomSheet>
+                            ) : (
+                                <div className="absolute top-16 right-0 w-80 h-[calc(100%-4rem)] bg-background border-l border-border overflow-y-auto shadow-xl animate-in slide-in-from-right duration-200">
+                                    <div className="p-6">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <h3 className="text-lg font-semibold text-foreground">File Information</h3>
+                                            <button onClick={() => setShowMetadata(false)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+                                                <X size={20} />
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="space-y-6">
+                                            {/* Basic File Info */}
+                                            <div className="space-y-3">
+                                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Properties</h4>
+                                                <div className="space-y-3 text-sm">
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-muted-foreground text-xs">Size</span>
+                                                        <span className="font-medium text-foreground">{formatBytes(previewFile.file.size)}</span>
+                                                    </div>
+                                                    {previewFile.file.lastModified && (
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="text-muted-foreground text-xs">Modified</span>
+                                                            <span className="font-medium text-foreground">{new Date(previewFile.file.lastModified).toLocaleString()}</span>
+                                                        </div>
+                                                    )}
+                                                    {previewFile.file.mimeType && (
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="text-muted-foreground text-xs">Type</span>
+                                                            <span className="font-medium text-foreground break-all">{previewFile.file.mimeType}</span>
+                                                        </div>
+                                                    )}
+                                                    {previewFile.file.eTag && (
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="text-muted-foreground text-xs">ETag</span>
+                                                            <span className="font-mono text-xs text-foreground break-all">{previewFile.file.eTag}</span>
+                                                        </div>
+                                                    )}
+                                                    {previewFile.file.storageClass && (
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="text-muted-foreground text-xs">Storage Class</span>
+                                                            <span className="font-medium text-foreground">{previewFile.file.storageClass}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* EXIF Data */}
+                                            {exifData && (
+                                                <div className="space-y-3 pt-6 border-t border-border">
+                                                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">EXIF Data</h4>
+                                                    <div className="space-y-3 text-sm">
+                                                        {exifData.Make && exifData.Model && (
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-muted-foreground text-xs">Camera</span>
+                                                                <span className="font-medium text-foreground">{exifData.Make} {exifData.Model}</span>
+                                                            </div>
+                                                        )}
+                                                        {exifData.DateTimeOriginal && (
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-muted-foreground text-xs">Date Taken</span>
+                                                                <span className="font-medium text-foreground">{new Date(exifData.DateTimeOriginal).toLocaleString()}</span>
+                                                            </div>
+                                                        )}
+                                                        {(exifData.ImageWidth || exifData.ExifImageWidth) && (exifData.ImageHeight || exifData.ExifImageHeight) && (
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-muted-foreground text-xs">Dimensions</span>
+                                                                <span className="font-medium text-foreground">{exifData.ImageWidth || exifData.ExifImageWidth} × {exifData.ImageHeight || exifData.ExifImageHeight}</span>
+                                                            </div>
+                                                        )}
+                                                        {exifData.ISO && (
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-muted-foreground text-xs">ISO</span>
+                                                                <span className="font-medium text-foreground">{exifData.ISO}</span>
+                                                            </div>
+                                                        )}
+                                                        {exifData.FNumber && (
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-muted-foreground text-xs">Aperture</span>
+                                                                <span className="font-medium text-foreground">f/{exifData.FNumber}</span>
+                                                            </div>
+                                                        )}
+                                                        {exifData.ExposureTime && (
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-muted-foreground text-xs">Shutter Speed</span>
+                                                                <span className="font-medium text-foreground">{exifData.ExposureTime < 1 ? `1/${Math.round(1 / exifData.ExposureTime)}s` : `${exifData.ExposureTime}s`}</span>
+                                                            </div>
+                                                        )}
+                                                        {exifData.FocalLength && (
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-muted-foreground text-xs">Focal Length</span>
+                                                                <span className="font-medium text-foreground">{exifData.FocalLength}mm</span>
+                                                            </div>
+                                                        )}
+                                                        {(exifData.latitude || exifData.GPSLatitude) && (exifData.longitude || exifData.GPSLongitude) && (
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-muted-foreground text-xs">GPS Coordinates</span>
+                                                                <span className="font-mono text-xs text-foreground break-all">
+                                                                    {(exifData.latitude || exifData.GPSLatitude).toFixed(6)}, {(exifData.longitude || exifData.GPSLongitude).toFixed(6)}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        )}
                     </div>
                 </div>
             )}
@@ -1516,6 +2096,38 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                         )}
                     </div>
 
+                    {/* Sort Controls */}
+                    <div className="hidden md:flex items-center gap-1 bg-secondary rounded-md p-0.5 border border-border">
+                        <button
+                            onClick={() => setSortBy('name')}
+                            className={`px-2 py-1.5 rounded-sm text-xs font-medium transition-all flex items-center gap-1 ${sortBy === 'name' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                            title="Sort by name"
+                        >
+                            <Type size={14} /> Name
+                        </button>
+                        <button
+                            onClick={() => setSortBy('size')}
+                            className={`px-2 py-1.5 rounded-sm text-xs font-medium transition-all flex items-center gap-1 ${sortBy === 'size' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                            title="Sort by size"
+                        >
+                            <HardDriveDownload size={14} /> Size
+                        </button>
+                        <button
+                            onClick={() => setSortBy('date')}
+                            className={`px-2 py-1.5 rounded-sm text-xs font-medium transition-all flex items-center gap-1 ${sortBy === 'date' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                            title="Sort by date"
+                        >
+                            <Calendar size={14} /> Date
+                        </button>
+                        <button
+                            onClick={() => setSortDirection(d => d === 'asc' ? 'desc' : 'asc')}
+                            className="px-1.5 py-1.5 rounded-sm hover:bg-background text-muted-foreground hover:text-foreground transition-all"
+                            title={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}
+                        >
+                            {sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                        </button>
+                    </div>
+
                     <button
                         onClick={toggleSelectionMode}
                         className={`p-2 rounded-md transition-all flex items-center gap-2 ${selectionMode ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-md' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'}`}
@@ -1540,6 +2152,13 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
 
                     {!readOnly && (
                         <>
+                            <button
+                                onClick={() => setCreateFolderModal({ show: true, folderName: '' })}
+                                className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors"
+                                title="New Folder"
+                            >
+                                <FolderPlus size={18} />
+                            </button>
                             <button
                                 onClick={() => setCreateFileModal({ show: true, filename: '', content: '' })}
                                 className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors"
@@ -1682,13 +2301,17 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                                             return (
                                                 <SwipeableListItem
                                                     key={file.key}
-                                                    actions={[
+                                                    actions={readOnly ? [
+                                                        { id: 'share', icon: Share2, label: 'Share', color: 'blue' }
+                                                    ] : [
                                                         { id: 'share', icon: Share2, label: 'Share', color: 'blue' },
+                                                        { id: 'rename', icon: Edit2, label: 'Rename', color: 'green' },
                                                         { id: 'move', icon: FolderInput, label: 'Move', color: 'yellow' },
                                                         { id: 'delete', icon: Trash2, label: 'Delete', color: 'red' }
                                                     ]}
                                                     onSwipeLeft={(actionId) => {
                                                         if (actionId === 'share') openShareModal(file);
+                                                        if (actionId === 'rename') openRenameModal(file);
                                                         if (actionId === 'move') {
                                                             setSelectedKeys(new Set([file.key]));
                                                             openMoveModal();
@@ -1951,6 +2574,16 @@ const Explorer: React.FC<ExplorerProps> = ({ s3, bucketName, onUpload, onBackToB
                         {!readOnly && (
                             <>
                                 <div className="h-px bg-border my-1" />
+                                <button
+                                    onClick={() => {
+                                        openRenameModal(contextMenu.file!);
+                                        setContextMenu({ show: false, file: null, x: 0, y: 0 });
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-sm hover:bg-secondary flex items-center gap-2 transition-colors"
+                                >
+                                    <Edit2 size={16} />
+                                    Rename
+                                </button>
                                 <button
                                     onClick={() => {
                                         const newSelected = new Set(selectedKeys);

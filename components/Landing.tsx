@@ -326,15 +326,27 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                         color="bg-purple-500/10"
                     />
                     <FeatureCard
+                        icon={<Folder className="text-orange-500" />}
+                        title="Full File Management"
+                        description="Rename files, create folders, sort by name/size/date, and organize your storage with intuitive context menus and swipe actions."
+                        color="bg-orange-500/10"
+                    />
+                    <FeatureCard
                         icon={<Eye className="text-pink-500" />}
                         title="Instant Previews"
-                        description="Preview images, videos, PDFs, EPUB books, and markdown files with syntax highlighting instantly without downloading them."
+                        description="Preview images, videos, PDFs, EPUB, markdown, Office files (Word, Excel), CSV data, and binary files—all without downloading."
                         color="bg-pink-500/10"
+                    />
+                    <FeatureCard
+                        icon={<ImageIcon className="text-indigo-500" />}
+                        title="EXIF & Metadata"
+                        description="View detailed file information including size, dates, storage class, and photo EXIF data like camera, GPS, and settings."
+                        color="bg-indigo-500/10"
                     />
                     <FeatureCard
                         icon={<Command className="text-cyan-500" />}
                         title="Keyboard Shortcuts"
-                        description="Navigate at the speed of thought with powerful keyboard shortcuts. Press Cmd+K to access the command palette for instant actions."
+                        description="Navigate at the speed of thought. Press Spacebar for Quick Look preview, Cmd+K for command palette, and more shortcuts for power users."
                         color="bg-cyan-500/10"
                     />
                 </div>

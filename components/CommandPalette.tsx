@@ -36,6 +36,13 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectedItemRef = useRef<HTMLDivElement>(null);
+  const [isMac, setIsMac] = useState(false);
+
+  useEffect(() => {
+    // Detect if user is on Mac
+    setIsMac(/Mac|iPhone|iPad|iPod/.test(navigator.platform));
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -46,6 +53,13 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
+
+  // Scroll selected item into view
+  useEffect(() => {
+    if (selectedItemRef.current) {
+      selectedItemRef.current.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedIndex]);
 
   const commands: CommandItem[] = useMemo(() => {
     const items: CommandItem[] = [
@@ -176,10 +190,12 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
               value={query}
               onChange={e => setQuery(e.target.value)}
             />
-            <div className="hidden sm:flex gap-1">
-                <kbd className="px-2 py-1 bg-secondary rounded text-[10px] text-muted-foreground font-mono">↑</kbd>
-                <kbd className="px-2 py-1 bg-secondary rounded text-[10px] text-muted-foreground font-mono">↓</kbd>
+            <div className="hidden sm:flex gap-1 items-center">
+                <kbd className="px-2 py-1 bg-secondary rounded text-[10px] text-muted-foreground font-mono">↑↓</kbd>
                 <kbd className="px-2 py-1 bg-secondary rounded text-[10px] text-muted-foreground font-mono">↵</kbd>
+                <span className="text-[10px] text-muted-foreground ml-1">|</span>
+                <kbd className="px-2 py-1 bg-secondary rounded text-[10px] text-muted-foreground font-mono">{isMac ? '⌘' : 'Ctrl'}</kbd>
+                <kbd className="px-2 py-1 bg-secondary rounded text-[10px] text-muted-foreground font-mono">K</kbd>
             </div>
           </div>
 
@@ -193,6 +209,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                  {filteredCommands.map((cmd, index) => (
                    <div
                      key={cmd.id}
+                     ref={index === selectedIndex ? selectedItemRef : null}
                      onClick={() => { cmd.action(); onClose(); }}
                      onMouseEnter={() => setSelectedIndex(index)}
                      className={`
@@ -221,7 +238,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
           </div>
           
           <div className="px-4 py-2 bg-secondary/50 border-t border-border text-[10px] text-muted-foreground flex justify-between items-center">
-              <span><span className="font-medium">ProTip:</span> Use <kbd className="bg-background border border-border px-1 rounded">Cmd</kbd> + <kbd className="bg-background border border-border px-1 rounded">K</kbd> to open this menu anywhere.</span>
+              <span><span className="font-medium">ProTip:</span> Use <kbd className="bg-background border border-border px-1 rounded">{isMac ? '⌘' : 'Ctrl'}</kbd> + <kbd className="bg-background border border-border px-1 rounded">K</kbd> to open this menu anywhere.</span>
               <span>{filteredCommands.length} results</span>
           </div>
        </div>
