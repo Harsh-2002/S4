@@ -93,11 +93,11 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                 <div className="w-full max-w-6xl mt-4 mb-8 md:mb-32 perspective-container group relative px-2 md:px-0 overflow-hidden">
 
                     {/* Mobile: Mockup Image */}
-                    <div className="md:hidden relative flex items-center justify-center py-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                    <div className="md:hidden relative flex items-center justify-center py-4 animate-in fade-in slide-in-from-bottom-8 duration-700">
                         <img 
                             src="/mobile-mockup.webp" 
                             alt="S4 Mobile Interface" 
-                            className="w-full max-w-sm h-auto drop-shadow-2xl group-hover:scale-105 transition-transform duration-500 ease-out"
+                            className="w-full max-w-sm h-auto drop-shadow-2xl group-hover:scale-110 transition-transform duration-500 ease-out scale-[1.3]"
                         />
                     </div>
 
