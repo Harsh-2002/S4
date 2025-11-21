@@ -92,10 +92,15 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                 {/* UI Illustration / Mockup */}
                 <div className="w-full max-w-6xl mt-4 mb-8 md:mb-32 perspective-container group relative px-2 md:px-0 overflow-hidden">
 
-                    {/* Dynamic Interactive Glow Background */}
-                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 rounded-[1.5rem] blur-2xl opacity-50 group-hover:opacity-75 transition-all duration-700 will-change-transform"></div>
+                    {/* Mobile: Mockup Image */}
+                    <div className="md:hidden relative flex items-center justify-center py-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                        <img 
+                            src="/mobile-mockup.webp" 
+                            alt="S4 Mobile Interface" 
+                            className="w-full max-w-sm h-auto drop-shadow-2xl group-hover:scale-105 transition-transform duration-500 ease-out"
+                        />
+                    </div>
 
-                    {/* Main Window Container */}
                     {/* Desktop: Interactive HTML Mockup */}
                     <div className="hidden md:block relative rounded-xl bg-background dark:bg-[#0F1115] border border-border shadow-2xl overflow-hidden transition-all duration-500 ease-out group-hover:shadow-blue-500/20 ring-1 ring-border group-hover:ring-blue-500/30">
 
