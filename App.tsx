@@ -43,21 +43,21 @@ const App = () => {
         loadProfiles();
     }, []);
 
-    // Update theme-color meta tag based on view
+    // Update theme-color meta tag based on view and dark mode
     useEffect(() => {
-        const metaThemeColorLight = document.querySelector('meta[name="theme-color"][media="(prefers-color-scheme: light)"]');
-        const metaThemeColorDark = document.querySelector('meta[name="theme-color"][media="(prefers-color-scheme: dark)"]');
+        const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+        if (!metaThemeColor) return;
 
+        let color = '#16181D'; // Dark mode default
+        
         if (view === 'landing') {
-            // Bluish tint for landing page (matches hero section ambient light)
-            metaThemeColorLight?.setAttribute('content', '#e8f0ff');
-            metaThemeColorDark?.setAttribute('content', '#0f1318');
+            color = isDarkMode ? '#0f1318' : '#e8f0ff';
         } else {
-            // Normal background colors for app
-            metaThemeColorLight?.setAttribute('content', '#ffffff');
-            metaThemeColorDark?.setAttribute('content', '#16181D');
+            color = isDarkMode ? '#16181D' : '#ffffff';
         }
-    }, [view]);
+        
+        metaThemeColor.setAttribute('content', color);
+    }, [view, isDarkMode]);
 
     // Load Profiles from Local Storage
     const loadProfiles = async () => {
@@ -154,7 +154,15 @@ const App = () => {
 
     const handleToggleTheme = () => {
         document.documentElement.classList.toggle('dark');
-        setIsDarkMode(prev => !prev);
+        const newDarkMode = !document.documentElement.classList.contains('dark');
+        setIsDarkMode(newDarkMode);
+        
+        // Update theme-color immediately for Safari
+        const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+        if (metaThemeColor) {
+            const color = newDarkMode ? '#16181D' : '#ffffff';
+            metaThemeColor.setAttribute('content', color);
+        }
     };
 
     const handleUpload = async (file: File, prefix: string, onComplete: () => void) => {
