@@ -115,22 +115,30 @@ const DocxPreview: React.FC<DocxPreviewProps> = ({ url, fileName }) => {
       <div className="h-full w-full overflow-auto p-4 md:p-8">
         <style>{`
           .docx-wrapper {
-            background: var(--background);
-            color: var(--foreground);
+            background: transparent;
+            padding: 0;
             max-width: 850px;
             margin: 0 auto;
           }
           .docx-wrapper section.docx {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 0.5rem;
+            background: white !important;
+            color: black !important;
+            border: 1px solid #e5e7eb;
             margin-bottom: 1.5rem;
-            padding: 2rem;
-            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+            padding: 3rem !important;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
           }
-          .docx-wrapper p {
-            margin: 0.5rem 0;
-            color: var(--foreground);
+          .docx-wrapper p, 
+          .docx-wrapper span, 
+          .docx-wrapper li, 
+          .docx-wrapper div,
+          .docx-wrapper h1, 
+          .docx-wrapper h2, 
+          .docx-wrapper h3,
+          .docx-wrapper h4, 
+          .docx-wrapper h5, 
+          .docx-wrapper h6 {
+            color: black !important;
           }
           .docx-wrapper table {
             border-collapse: collapse;
@@ -139,17 +147,13 @@ const DocxPreview: React.FC<DocxPreviewProps> = ({ url, fileName }) => {
           }
           .docx-wrapper table td,
           .docx-wrapper table th {
-            border: 1px solid var(--border);
+            border: 1px solid #e5e7eb;
             padding: 0.5rem;
+            color: black !important;
           }
           .docx-wrapper img {
             max-width: 100%;
             height: auto;
-          }
-          .docx-wrapper h1, .docx-wrapper h2, .docx-wrapper h3,
-          .docx-wrapper h4, .docx-wrapper h5, .docx-wrapper h6 {
-            margin: 1rem 0 0.5rem 0;
-            color: var(--foreground);
           }
         `}</style>
         <div
