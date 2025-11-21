@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 interface XlsxPreviewProps {
   url: string;
@@ -8,6 +9,7 @@ interface XlsxPreviewProps {
 }
 
 const XlsxPreview: React.FC<XlsxPreviewProps> = ({ url, fileName }) => {
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sheets, setSheets] = useState<{ name: string; data: any[][] }[]>([]);
@@ -71,7 +73,7 @@ const XlsxPreview: React.FC<XlsxPreviewProps> = ({ url, fileName }) => {
 
   // Get max columns across all rows
   const maxCols = Math.max(...currentSheet.data.map(row => row.length));
-  
+
   // Column headers (A, B, C, ...)
   const columnHeaders = Array.from({ length: maxCols }, (_, i) => {
     let col = '';
@@ -92,11 +94,10 @@ const XlsxPreview: React.FC<XlsxPreviewProps> = ({ url, fileName }) => {
             <button
               key={idx}
               onClick={() => setActiveSheet(idx)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
-                idx === activeSheet
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${idx === activeSheet
                   ? 'bg-blue-500 text-white shadow-sm'
                   : 'bg-secondary text-foreground hover:bg-secondary/80 border border-border'
-              }`}
+                }`}
             >
               {sheet.name}
             </button>
@@ -127,7 +128,8 @@ const XlsxPreview: React.FC<XlsxPreviewProps> = ({ url, fileName }) => {
                 {columnHeaders.map((header, idx) => (
                   <th
                     key={idx}
-                    className="px-3 py-2 text-xs font-semibold text-muted-foreground border-b border-border min-w-[120px] text-left whitespace-nowrap"
+                    className={`px-2 py-2 text-xs font-semibold text-muted-foreground border-b border-border text-left whitespace-nowrap ${isMobile ? 'min-w-[80px]' : 'min-w-[120px]'
+                      }`}
                   >
                     {header}
                   </th>
@@ -147,7 +149,8 @@ const XlsxPreview: React.FC<XlsxPreviewProps> = ({ url, fileName }) => {
                     return (
                       <td
                         key={cellIdx}
-                        className="px-3 py-2 text-sm text-foreground border-b border-border whitespace-nowrap overflow-hidden text-ellipsis max-w-xs"
+                        className={`border-b border-border whitespace-nowrap overflow-hidden text-ellipsis ${isMobile ? 'px-2 py-1.5 text-xs max-w-[150px]' : 'px-3 py-2 text-sm max-w-xs'
+                          } text-foreground`}
                         title={cell != null ? String(cell) : ''}
                       >
                         {cell ?? ''}

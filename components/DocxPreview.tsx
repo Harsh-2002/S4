@@ -60,7 +60,7 @@ const DocxPreview: React.FC<DocxPreviewProps> = ({ url, fileName }) => {
         console.log('Rendering DOCX with docx-preview...');
         // Clear previous content
         containerRef.current.innerHTML = '';
-        
+
         await renderAsync(docData, containerRef.current, undefined, {
           className: 'docx-wrapper',
           inWrapper: true,
@@ -73,7 +73,7 @@ const DocxPreview: React.FC<DocxPreviewProps> = ({ url, fileName }) => {
           trimXmlDeclaration: true,
           useBase64URL: true,
         });
-        
+
         console.log('DOCX rendered successfully');
         if (isMounted) {
           setLoading(false);
@@ -112,22 +112,38 @@ const DocxPreview: React.FC<DocxPreviewProps> = ({ url, fileName }) => {
         </div>
       )}
 
-      <div className="h-full w-full overflow-auto p-4 md:p-8">
+      <div className="h-full w-full overflow-auto p-2 md:p-8">
         <style>{`
           .docx-wrapper {
             background: transparent;
             padding: 0;
-            max-width: 850px;
+            max-width: 100%;
             margin: 0 auto;
           }
+          
+          @media (min-width: 768px) {
+            .docx-wrapper {
+              max-width: 850px;
+            }
+          }
+          
           .docx-wrapper section.docx {
             background: white !important;
             color: black !important;
             border: 1px solid #e5e7eb;
-            margin-bottom: 1.5rem;
-            padding: 3rem !important;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            margin-bottom: 0.5rem;
+            padding: 1rem !important;
+            box-shadow: none;
           }
+          
+          @media (min-width: 768px) {
+            .docx-wrapper section.docx {
+              margin-bottom: 1.5rem;
+              padding: 3rem !important;
+              box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            }
+          }
+          
           .docx-wrapper p, 
           .docx-wrapper span, 
           .docx-wrapper li, 
@@ -140,17 +156,34 @@ const DocxPreview: React.FC<DocxPreviewProps> = ({ url, fileName }) => {
           .docx-wrapper h6 {
             color: black !important;
           }
+          
           .docx-wrapper table {
             border-collapse: collapse;
             width: 100%;
             margin: 1rem 0;
+            font-size: 0.875rem;
           }
+          
+          @media (min-width: 768px) {
+            .docx-wrapper table {
+              font-size: 1rem;
+            }
+          }
+          
           .docx-wrapper table td,
           .docx-wrapper table th {
             border: 1px solid #e5e7eb;
-            padding: 0.5rem;
+            padding: 0.25rem;
             color: black !important;
           }
+          
+          @media (min-width: 768px) {
+            .docx-wrapper table td,
+            .docx-wrapper table th {
+              padding: 0.5rem;
+            }
+          }
+          
           .docx-wrapper img {
             max-width: 100%;
             height: auto;

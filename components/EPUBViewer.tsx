@@ -41,7 +41,7 @@ const EPUBViewer: React.FC<EPUBViewerProps> = ({ url, fileName, data }) => {
                 // Set proper book width for readability
                 const maxWidth = window.innerWidth > 768 ? 800 : window.innerWidth - 32;
                 const containerHeight = viewerRef.current!.clientHeight || 600;
-                
+
                 const rendition = book.renderTo(viewerRef.current!, {
                     width: maxWidth,
                     height: containerHeight,
@@ -173,35 +173,35 @@ const EPUBViewer: React.FC<EPUBViewerProps> = ({ url, fileName, data }) => {
     return (
         <div className="w-full h-full flex flex-col bg-secondary/10">
             {/* Toolbar */}
-            <div className="flex items-center justify-between px-4 py-3 bg-background border-b border-border shrink-0">
-                <div className="flex items-center gap-3">
-                    <BookIcon size={18} className="text-primary" />
-                    <span className="text-sm font-medium truncate max-w-[200px]" title={fileName}>
+            <div className="flex items-center justify-between px-2 md:px-4 py-3 bg-background border-b border-border shrink-0">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                    <BookIcon size={18} className="text-primary shrink-0" />
+                    <span className="text-xs md:text-sm font-medium truncate" title={fileName}>
                         {fileName}
                     </span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 md:gap-2 shrink-0">
                     <button
                         onClick={goToPrevPage}
                         disabled={loading}
-                        className="p-2 rounded-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        className="p-1.5 md:p-2 rounded-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
                         title="Previous page"
                     >
-                        <ChevronLeft size={20} />
+                        <ChevronLeft size={18} className="md:w-5 md:h-5" />
                     </button>
                     {currentLocation && (
-                        <span className="text-xs text-muted-foreground min-w-[60px] text-center">
+                        <span className="text-[10px] md:text-xs text-muted-foreground font-mono tabular-nums min-w-[45px] md:min-w-[70px] text-center shrink-0">
                             {currentLocation}
                         </span>
                     )}
                     <button
                         onClick={goToNextPage}
                         disabled={loading}
-                        className="p-2 rounded-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        className="p-1.5 md:p-2 rounded-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
                         title="Next page"
                     >
-                        <ChevronRight size={20} />
+                        <ChevronRight size={18} className="md:w-5 md:h-5" />
                     </button>
                 </div>
             </div>

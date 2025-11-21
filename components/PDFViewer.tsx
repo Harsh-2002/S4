@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2 } from 'lucide-react';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 // Set worker from CDN
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -11,10 +12,36 @@ interface PDFViewerProps {
 }
 
 const PDFViewer: React.FC<PDFViewerProps> = ({ url, fileName }) => {
+    const isMobile = useIsMobile();
+    const containerRef = useRef<HTMLDivElement>(null);
     const [numPages, setNumPages] = useState<number>(0);
     const [pageNumber, setPageNumber] = useState<number>(1);
     const [scale, setScale] = useState<number>(1.0);
     const [loading, setLoading] = useState(true);
+    const [containerWidth, setContainerWidth] = useState<number>(0);
+
+    // Measure container width on mount and resize
+    useEffect(() => {
+        const measureContainer = () => {
+            if (containerRef.current) {
+                const width = containerRef.current.offsetWidth;
+                setContainerWidth(width);
+
+                // Auto-fit to width on mobile
+                if (isMobile && width > 0) {
+                    // Standard PDF page width is ~612 points
+                    // Account for padding (16px on each side = 32px total)
+                    const availableWidth = width - 32;
+                    const optimalScale = Math.min(availableWidth / 612, 1.5);
+                    setScale(optimalScale);
+                }
+            }
+        };
+
+        measureContainer();
+        window.addEventListener('resize', measureContainer);
+        return () => window.removeEventListener('resize', measureContainer);
+    }, [isMobile]);
 
     const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
         setNumPages(numPages);
@@ -85,7 +112,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ url, fileName }) => {
             </div>
 
             {/* PDF Content */}
-            <div className="flex-1 overflow-auto flex items-start justify-center p-4">
+            <div ref={containerRef} className="flex-1 overflow-auto flex items-start justify-center p-4">
                 {loading && (
                     <div className="flex items-center gap-2 text-muted-foreground mt-8">
                         <Loader2 className="animate-spin" size={20} />
